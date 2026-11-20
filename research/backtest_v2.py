@@ -98,7 +98,7 @@ def zone_hits(d, Z, side):
 
 def run(d, f, side, zone_kinds=ALL_KINDS, use_zone=True, bg_n=3, uhv_mult=1.75,
         vol_n=10, big=0.0, use_cisd=False, w_sweep=288, w_trig=12, sweep_next_only=False, strong_body=0.0,
-        sessions=("NY", "Overlap"), r_targets=(1.0, 2.0), partial=0.5, zcache={}):
+        sessions=("NY", "Overlap"), r_targets=(1.0, 2.0), partial=0.5, zcache={}, uhv_mask=None):
     o, h, l, c, v = (d[x].values for x in ("open", "high", "low", "close", "volume"))
     n = len(d); s = 1 if side == "BUY" else -1
     vr = v / pd.Series(v.astype(float)).rolling(vol_n).mean().shift(1).values
@@ -114,6 +114,8 @@ def run(d, f, side, zone_kinds=ALL_KINDS, use_zone=True, bg_n=3, uhv_mult=1.75,
     while i < n - 2:
         u = i
         ok = red[u] and vr[u] >= uhv_mult and rs[u] >= big and red[u - bg_n:u].all() if bg_n else red[u] and vr[u] >= uhv_mult and rs[u] >= big
+        if uhv_mask is not None:
+            ok = bool(uhv_mask[u])
         if ok and use_zone and zh[u] == "":
             ok = False
         if not ok:
