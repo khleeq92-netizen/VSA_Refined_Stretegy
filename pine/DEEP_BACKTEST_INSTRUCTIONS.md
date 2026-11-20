@@ -1,28 +1,28 @@
-# Running the research strategy with Deep Backtesting (TradingView Premium)
+# UHV Sweep Reversal — how to load and test
 
-Defaults follow the rules rebuilt from your chart examples (v7): the UHV candle is the volume peak of the climax,
-the sweep of the UHV extreme is required, entry after a candle CLOSES beyond the opposite UHV extreme, SL 160 pips, half off at 120 pips,
-rest at 2 × SL, all sessions.
-
-1. Open `OANDA:XAUUSD`, timeframe **5m**.
+## Load
+1. Chart: `OANDA:XAUUSD`, **5m**.
 2. Pine Editor → delete everything → paste `UHV_Sweep_Reversal_Strategy.txt` → **Save** → **Add to chart**.
-   If it shows an error, send Claude the line number and message.
-3. Strategy Tester → **Deep Backtesting** on → date range **2021-01-01 → today** → Generate report.
-4. Run each row (gear icon → Inputs), then **List of Trades → Export (CSV)**:
+   If an error appears, send Claude the line number and message.
 
-| Run | Direction | Move SL to breakeven after TP1 | SELL UHV multiplier | File name |
-|---|---|---|---|---|
-| 1 | Buy only | off | — | `run1_buy.csv` |
-| 2 | Buy only | on | — | `run2_buy_be.csv` |
-| 3 | Sell only | off | 2.0 | `run3_sell.csv` |
-| 4 | Sell only | on | 2.0 | `run4_sell_be.csv` |
-| 5 | Sell only | off | 2.5 | `run5_sell_25.csv` |
+## Default settings (current best candidates from the Aug–Nov 2026 research)
+| | BUY | SELL |
+|---|---|---|
+| UHV candle | red, volume peak of the climax, ≥ 2.0× avg volume, **range ≥ 2× ATR** | green, volume peak, **≥ 2.5× avg volume** |
+| Trigger | UHV low swept → candle **closes** above the UHV high | UHV high swept → candle **closes** below the UHV low |
+| Sessions | all | all except the London–NY overlap |
+| Stop | 160 pips | 160 pips |
+| Target | **100% at 100 pips** | **50% at 100 pips, rest at 320 pips** (no breakeven) |
 
-Quality-filter runs (settings group "Quality filters"), all with breakeven ON:
+## Deep Backtesting (Strategy Tester → Deep Backtesting → 2021-01-01 → today)
+Run each row and export **List of Trades** as CSV:
 
-| Run | Direction | Filter settings | File name |
+| Run | Direction | Change from defaults | File name |
 |---|---|---|---|
-| 6 | Buy only | BUY: UHV candle range >= **2.0** ATR | `run6_buy_range2.csv` |
-| 7 | Sell only | SELL UHV multiplier **2.5** + Skip London–NY overlap **on** | `run7_sell_vol25_noovl.csv` |
+| A | Buy only | none | `A_buy.csv` |
+| B | Sell only | none | `B_sell.csv` |
+| C | Buy only | Quality filters → BUY range = **0** (filter off) | `C_buy_nofilter.csv` |
+| D | Sell only | SELL multiplier **2.0** and SELL skip overlap **off** | `D_sell_nofilter.csv` |
 
-Leave every other input at its default. Keep **Risk per trade = $100**, so profit ÷ 100 = R.
+A and B are the recommended setups; C and D show whether the filters help across 2021–2026.
+Keep **Risk per trade = $100** (profit ÷ 100 = R).

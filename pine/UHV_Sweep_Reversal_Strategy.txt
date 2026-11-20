@@ -3,7 +3,9 @@
 // Mirrors the Python research engine (research/backtest_v5.py and research/backtest_v2.py).
 // Purpose: multi-year validation. It is NOT a validated live-trading system.
 //
-// Default setup (rebuilt from the trader's chart examples, 11/12/16/19-Nov-2026):
+// Default setup (rebuilt from the trader's chart examples, 11/12/16/19-Nov-2026) + best research filters:
+//  BUY : UHV candle range >= 2 x ATR(20); exit 100% at 100 pips (SL 160 pips).
+//  SELL: UHV volume >= 2.5 x average; no entries in the London-NY overlap; 50% at 100 pips, rest at 2 x SL.
 //  BUY : selling climax in the lower part of the range -> the UHV candle is the VOLUME PEAK of that climax
 //        (red, volume >= 2x avg, higher than the 2 candles before and the candle after) -> a later candle
 //        sweeps the UHV low -> within 12 bars a bullish candle CLOSES above the UHV high -> enter next open
@@ -21,7 +23,7 @@ strategy("UHV Sweep Reversal [research]", overlay = true, initial_capital = 1000
 
 // ───────── General
 gG = "General"
-dirMode   = input.string("Buy only", "Direction", options = ["Buy only", "Sell only", "Both"], group = gG,
+dirMode   = input.string("Both", "Direction", options = ["Buy only", "Sell only", "Both"], group = gG,
      tooltip = "Run Buy only and Sell only as separate backtests to match the research.")
 startT    = input.time(timestamp("2021-01-01T00:00:00"), "Backtest start", group = gG)
 endT      = input.time(timestamp("2030-01-01T00:00:00"), "Backtest end", group = gG)
@@ -35,7 +37,7 @@ gU = "UHV detector"
 uhvPick   = input.string("Volume peak", "Which candle is the UHV", options = ["Volume peak", "Big candle"], group = gU,
      tooltip = "Volume peak: the highest-volume candle of the climax (body size not required) — matches your 19-Nov example. Big candle: your indicator's Part 4 rules incl. body >= 1.2x.")
 vmBuy     = input.float(2.0, "BUY UHV multiplier (x avg volume)", step = 0.1, group = gU)
-vmSell    = input.float(2.0, "SELL UHV multiplier (x avg volume)", step = 0.1, group = gU)
+vmSell    = input.float(2.5, "SELL UHV multiplier (x avg volume)", step = 0.1, group = gU)
 nAvg      = input.int(40, "Lookback for volume / size averages", group = gU)
 bodyK     = input.float(1.2, "Body >= x average body (Big candle only)", step = 0.1, group = gU)
 rangeK    = input.float(1.2, "Range >= x average range", step = 0.1, group = gU)
@@ -67,9 +69,10 @@ slBuf     = input.float(0.10, "Structural SL buffer ($)", step = 0.05, group = g
 
 // ───────── Quality filters (research candidates — off by default; test them as separate Deep Backtest runs)
 gQ = "Quality filters"
-minRngB   = input.float(0.0, "BUY: UHV candle range >= x ATR(20) (0 = off; research: 2.0)", step = 0.25, group = gQ)
+minRngB   = input.float(2.0, "BUY: UHV candle range >= x ATR(20) (0 = off)", step = 0.25, group = gQ)
 minRngS   = input.float(0.0, "SELL: UHV candle range >= x ATR(20) (0 = off)", step = 0.25, group = gQ)
-skipOvl   = input.bool(false, "Skip entries in the London–New York overlap", group = gQ,
+skipOvlB  = input.bool(false, "BUY: skip entries in the London–New York overlap", group = gQ)
+skipOvl   = input.bool(true, "SELL: skip entries in the London–New York overlap", group = gQ,
      tooltip = "Overlap = London 08:00–16:30 AND New York 08:00–17:00 local times (DST-aware).")
 
 // ───────── Higher-timeframe zone filter
@@ -89,10 +92,11 @@ exitMode  = input.string("Fixed pips", "Exit mode", options = ["Fixed pips", "St
      tooltip = "Fixed pips: SL / TP1 in pips, final TP = Final TP (R) x SL. Structural: SL beyond the sweep extreme, TPs in R.")
 pipSize   = input.float(0.10, "Pip size ($) — XAUUSD 1 pip = 0.10", step = 0.01, group = gX)
 slPips    = input.float(160, "Fixed SL (pips)", group = gX)
-tp1Pips   = input.float(120, "Fixed TP1 (pips)", group = gX)
+tp1Pips   = input.float(100, "Fixed TP1 / safer target (pips)", group = gX)
 tp1R      = input.float(1.0, "Structural TP1 (R)", step = 0.25, group = gX)
 tp2R      = input.float(2.0, "Final TP (R)", step = 0.25, group = gX)
-tp1Pct    = input.float(50, "% closed at TP1 (100 = single target at TP1)", minval = 0, maxval = 100, group = gX)
+tp1PctB   = input.float(100, "BUY: % closed at TP1 (100 = single target)", minval = 0, maxval = 100, group = gX)
+tp1PctS   = input.float(50, "SELL: % closed at TP1 (rest runs to Final TP)", minval = 0, maxval = 100, group = gX)
 useBE     = input.bool(false, "Move SL to breakeven after TP1", group = gX)
 maxHold   = input.int(96, "Time exit after N bars", group = gX)
 
@@ -236,8 +240,8 @@ atr20   = ta.sma(ta.tr(true), 20)[1]
 uRngAtr = (high[uOff] - low[uOff]) / atr20[uOff]
 inLon   = not na(time(timeframe.period, "0800-1630", "Europe/London"))
 inNY    = not na(time(timeframe.period, "0800-1700", "America/New_York"))
-ovlOK   = not (skipOvl and inLon and inNY)
-inSess  = inSessRaw and ovlOK
+inSessB = inSessRaw and not (skipOvlB and inLon and inNY)
+inSessS = inSessRaw and not (skipOvl and inLon and inNY)
 
 // CISD candle: first candle of the against-colour run ending at the UHV candle (inside candle -> mother candle)
 f_cisd(bool isBuy, int off) =>
@@ -257,6 +261,7 @@ f_cisd(bool isBuy, int off) =>
 // Places entry + exits. Fixed pips: exits are relative to the actual fill (profit/loss in ticks).
 f_orders(bool isLong, float entryPx, float structSL, bool asStop) =>
     string id = isLong ? "L" : "S"
+    float  pct = isLong ? tp1PctB : tp1PctS
     float  risk = fixedX ? fixRisk : math.abs(entryPx - structSL)
     float  qty = riskUSD / risk
     if asStop
@@ -265,14 +270,17 @@ f_orders(bool isLong, float entryPx, float structSL, bool asStop) =>
         strategy.entry(id, isLong ? strategy.long : strategy.short, qty = qty)
     if fixedX
         int lossT = toTicks(fixRisk)
-        if tp1Pct > 0
-            strategy.exit(id + "-TP1", id, qty_percent = tp1Pct, profit = toTicks(tp1Pips * pipSize), loss = lossT)
+        if pct > 0
+            strategy.exit(id + "-TP1", id, qty_percent = pct, profit = toTicks(tp1Pips * pipSize), loss = lossT)
         strategy.exit(id + "-TP2", id, profit = toTicks(tp2R * fixRisk), loss = lossT)
     else
         float d = isLong ? 1.0 : -1.0
-        if tp1Pct > 0
-            strategy.exit(id + "-TP1", id, qty_percent = tp1Pct, limit = entryPx + d * tp1R * risk, stop = structSL)
+        if pct > 0
+            strategy.exit(id + "-TP1", id, qty_percent = pct, limit = entryPx + d * tp1R * risk, stop = structSL)
         strategy.exit(id + "-TP2", id, limit = entryPx + d * tp2R * risk, stop = structSL)
+
+// In "Both" mode only one side may fire per bar (BUY has priority)
+bool firedB = false
 
 // ═════════ BUY setup state machine
 var bool  bAct = false
@@ -297,8 +305,9 @@ if bAct and bar_index > bU
     else if bar_index > bSwBar
         int since = bar_index - bSwBar
         if stopEnt
-            if since < trigMax and inSess and inDate and allowB and flat
+            if since < trigMax and inSessB and inDate and allowB and flat
                 f_orders(true, bH + entBuf, bLow - slBuf, true)
+                firedB := true
             else if since >= trigMax
                 strategy.cancel("L")
                 bAct := false
@@ -306,8 +315,9 @@ if bAct and bar_index > bU
             if since > trigMax
                 bAct := false
             else if close > open and close > bLvl
-                if inSess and inDate and flat and allowB
+                if inSessB and inDate and flat and allowB
                     f_orders(true, close, bLow - slBuf, false)
+                    firedB := true
                 bAct := false
 
 if not bAct and uhvBuy and flat and allowB and (not useZone or zoneBull) and uRngAtr >= minRngB
@@ -348,7 +358,7 @@ if sAct and bar_index > sU
     else if bar_index > sSwBar
         int since = bar_index - sSwBar
         if stopEnt
-            if since < trigMax and inSess and inDate and allowS and flat
+            if since < trigMax and inSessS and inDate and allowS and flat and not firedB
                 f_orders(false, sL - entBuf, sHigh + slBuf, true)
             else if since >= trigMax
                 strategy.cancel("S")
@@ -357,11 +367,11 @@ if sAct and bar_index > sU
             if since > trigMax
                 sAct := false
             else if close < open and close < sLvl
-                if inSess and inDate and flat and allowS
+                if inSessS and inDate and flat and allowS and not firedB
                     f_orders(false, close, sHigh + slBuf, false)
                 sAct := false
 
-if not sAct and uhvSell and flat and allowS and (not useZone or zoneBear) and uRngAtr >= minRngS
+if not sAct and uhvSell and flat and allowS and not firedB and (not useZone or zoneBear) and uRngAtr >= minRngS
     sAct := true
     sSw := false
     sU := bar_index - uOff
@@ -377,9 +387,10 @@ if not sAct and uhvSell and flat and allowS and (not useZone or zoneBear) and uR
             sAct := false
 
 // Stop-entry mode: arm the stop order at the close of the sweep candle (active from the next candle)
-if bAct and bSw and stopEnt and bar_index == bSwBar and inSess and inDate and allowB and flat
+if bAct and bSw and stopEnt and bar_index == bSwBar and inSessB and inDate and allowB and flat
     f_orders(true, bH + entBuf, bLow - slBuf, true)
-if sAct and sSw and stopEnt and bar_index == sSwBar and inSess and inDate and allowS and flat
+    firedB := true
+if sAct and sSw and stopEnt and bar_index == sSwBar and inSessS and inDate and allowS and flat and not firedB
     f_orders(false, sL - entBuf, sHigh + slBuf, true)
 
 // ═════════ Position management: breakeven after TP1, time exit, level lines
@@ -397,7 +408,8 @@ if strategy.position_size != 0 and nz(strategy.position_size[1]) == 0
     float rk = fixedX ? fixRisk : math.abs(ep - (dd > 0 ? bLow - slBuf : sHigh + slBuf))
     slLine := ep - dd * rk
     tpLine := ep + dd * tp2R * rk
-if useBE and tp1Pct > 0 and tp1Pct < 100 and not beDone and strategy.position_size != 0 and math.abs(strategy.position_size) < entQty * 0.999
+curPct = strategy.position_size > 0 ? tp1PctB : tp1PctS
+if useBE and curPct > 0 and curPct < 100 and not beDone and strategy.position_size != 0 and math.abs(strategy.position_size) < entQty * 0.999
     beDone := true
     slLine := strategy.position_avg_price
     if strategy.position_size > 0
