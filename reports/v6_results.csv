@@ -1,0 +1,13 @@
+side,variant,n,win,tp1_hit,avg_pips,total,PF,maxDD,IS,OOS
+BUY,v5 (cancel on opposite close),46,48,52,4.6,213,1.07,1257,35.0,-16.8
+BUY,"v6: no cancel, sweep within 1 day",50,48,50,2.3,115,1.03,1305,18.2,-10.2
+BUY,"v6: no cancel, sweep within 4h",51,45,49,-4.7,-240,0.94,1421,7.3,-13.8
+BUY,v6 + breakeven,50,58,50,-3.5,-176,0.95,1277,22.6,-24.1
+BUY,"v6, close entry",46,41,52,-12.4,-570,0.83,1367,5.7,-26.3
+BUY,"v6, close entry + breakeven",46,57,52,-9.6,-443,0.86,1173,6.3,-21.9
+SELL,v5 (cancel on opposite close),46,50,61,28.1,1292,1.44,488,27.0,29.3
+SELL,"v6: no cancel, sweep within 1 day",52,48,62,24.3,1262,1.38,523,10.9,38.7
+SELL,"v6: no cancel, sweep within 4h",52,48,60,21.6,1122,1.32,523,10.9,33.1
+SELL,v6 + breakeven,53,62,62,23.0,1217,1.39,488,8.3,39.4
+SELL,"v6, close entry",42,45,62,25.6,1074,1.42,505,36.2,16.8
+SELL,"v6, close entry + breakeven",43,63,63,29.5,1268,1.53,533,36.0,23.8

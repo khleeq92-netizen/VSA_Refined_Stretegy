@@ -1,0 +1,13 @@
+side,variant,n,win,tp1_hit,avg_pips,total,PF,maxDD,IS,OOS
+BUY,"close entry, no cancel, hold 8h",46,41,52,-12.4,-570,0.83,1367,5.7,-26.3
+BUY,"close entry, no cancel, hold 8h, BE after TP1",46,57,52,-9.6,-443,0.86,1173,6.3,-21.9
+BUY,"close entry, no cancel, hold 16h",44,36,59,-4.4,-194,0.94,1137,7.4,-14.2
+BUY,"close entry, no cancel, hold 16h, BE after TP1",45,58,58,-8.4,-380,0.88,1032,-3.0,-12.8
+BUY,"close entry, no cancel, hold 24h",43,30,58,-10.0,-432,0.87,1268,9.0,-26.6
+BUY,"close entry, no cancel, hold 24h, BE after TP1",45,58,58,-8.4,-380,0.88,1032,-3.0,-12.8
+SELL,"close entry, no cancel, hold 8h",42,45,62,25.6,1074,1.42,505,36.2,16.8
+SELL,"close entry, no cancel, hold 8h, BE after TP1",43,63,63,29.5,1268,1.53,533,36.0,23.8
+SELL,"close entry, no cancel, hold 16h",40,42,62,19.0,758,1.29,603,45.5,-5.0
+SELL,"close entry, no cancel, hold 16h, BE after TP1",43,65,65,23.9,1028,1.42,652,38.0,11.7
+SELL,"close entry, no cancel, hold 24h",40,42,62,25.5,1020,1.38,492,45.5,7.4
+SELL,"close entry, no cancel, hold 24h, BE after TP1",43,65,65,23.9,1028,1.42,652,38.0,11.7

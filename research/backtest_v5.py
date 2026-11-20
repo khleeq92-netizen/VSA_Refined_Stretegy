@@ -24,7 +24,7 @@ def climax_peak(side, vm=2.0):
     against = (c <= o) if side == "BUY" else (c >= o)
     return m & peak.values & against
 
-def run(side, entry="stop", sessions=None, sl_p=160, tp1_p=120, tp2_mult=2.0, be=False, part=0.5, vm=2.0, w_trig=12):
+def run(side, entry="stop", sessions=None, sl_p=160, tp1_p=120, tp2_mult=2.0, be=False, part=0.5, vm=2.0, w_trig=12, cancel_opp=True, w_sweep=288, hold=96):
     s = 1 if side == "BUY" else -1
     H, L, O, C = (h, l, o, c) if s == 1 else (-l, -h, -o, -c)
     mask = climax_peak(side, vm)
@@ -33,9 +33,9 @@ def run(side, entry="stop", sessions=None, sl_p=160, tp1_p=120, tp2_mult=2.0, be
         if not mask[i]: i += 1; continue
         u = i
         sw = None
-        for k in range(u + 1, min(n, u + 289)):
+        for k in range(u + 1, min(n, u + 1 + w_sweep)):
             if L[k] < L[u]: sw = k; break
-            if C[k] > H[u]: break
+            if cancel_opp and C[k] > H[u]: break
         if sw is None: i += 1; continue
         lvl = H[u] + 0.10; ent = None
         for t in range(sw + 1, min(n - 1, sw + 1 + w_trig)):
@@ -49,7 +49,7 @@ def run(side, entry="stop", sessions=None, sl_p=160, tp1_p=120, tp2_mult=2.0, be
         risk = sl_p * 0.1; stop = e - risk; t1 = e + tp1_p * 0.1; t2 = e + tp2_mult * risk
         got1 = False; pnl = 0.0; mae = 0.0; why = "time"
         first = True
-        for k in range(t, min(n, t + 96)):
+        for k in range(t, min(n, t + hold)):
             lo = L[k] if not (first and entry == "stop") else min(L[k], e)  # on the fill bar only count moves after fill (approx.)
             mae = max(mae, e - L[k])
             if L[k] <= stop:

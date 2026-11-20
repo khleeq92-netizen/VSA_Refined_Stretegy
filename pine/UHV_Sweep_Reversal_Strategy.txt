@@ -3,10 +3,11 @@
 // Mirrors the Python research engine (research/backtest_v5.py and research/backtest_v2.py).
 // Purpose: multi-year validation. It is NOT a validated live-trading system.
 //
-// Default setup (rebuilt from the trader's 19-Nov-2026 example):
+// Default setup (rebuilt from the trader's chart examples, 11/12/16/19-Nov-2026):
 //  BUY : selling climax in the lower part of the range -> the UHV candle is the VOLUME PEAK of that climax
 //        (red, volume >= 2x avg, higher than the 2 candles before and the candle after) -> a later candle
-//        sweeps the UHV low -> buy-stop at UHV high + $0.10 for 12 bars -> SL 160 pips, 50% at 120 pips,
+//        sweeps the UHV low -> within 12 bars a bullish candle CLOSES above the UHV high -> enter next open
+//        -> SL 160 pips, 50% at 120 pips,
 //        rest at 2 x SL. 1 pip = $0.10.
 //  SELL: exact mirror.
 // All signals use confirmed bars. Higher-timeframe zones use completed HTF candles only (no repainting).
@@ -54,8 +55,10 @@ bgNeed    = input.int(2, "Background tests that must pass (of 3)", minval = 1, m
 
 // ───────── Setup / entry
 gS = "Setup and entry"
-entryMode = input.string("Break of UHV extreme (stop order)", "Entry", options = ["Break of UHV extreme (stop order)", "Candle close beyond"], group = gS)
+entryMode = input.string("Candle close beyond", "Entry", options = ["Break of UHV extreme (stop order)", "Candle close beyond"], group = gS)
 sweepMax  = input.int(288, "Max bars from UHV to sweep", group = gS)
+cancelOpp = input.bool(false, "Cancel setup if price closes beyond the opposite UHV extreme before the sweep", group = gS,
+     tooltip = "Off = your 11-Nov example stays valid (price closed below the UHV low before sweeping its high).")
 trigMax   = input.int(12, "Max bars from sweep to entry", group = gS)
 entBuf    = input.float(0.10, "Stop-order buffer beyond UHV extreme ($)", step = 0.05, group = gS)
 useCisd   = input.bool(false, "Require close beyond the CISD candle too (close entry only)", group = gS)
@@ -276,7 +279,7 @@ if bAct and bar_index > bU
         if low < bL
             bSw := true
             bSwBar := bar_index
-        else if close > bH or bar_index - bU >= sweepMax
+        else if (cancelOpp and close > bH) or bar_index - bU >= sweepMax
             bAct := false
     else if bar_index > bSwBar
         int since = bar_index - bSwBar
@@ -306,7 +309,7 @@ if not bAct and uhvBuy and flat and allowB and (not useZone or zoneBull)
         if low < bL
             bSw := true
             bSwBar := bar_index
-        else if close > bH
+        else if cancelOpp and close > bH
             bAct := false
 
 // ═════════ SELL setup state machine (mirror)
@@ -327,7 +330,7 @@ if sAct and bar_index > sU
         if high > sH
             sSw := true
             sSwBar := bar_index
-        else if close < sL or bar_index - sU >= sweepMax
+        else if (cancelOpp and close < sL) or bar_index - sU >= sweepMax
             sAct := false
     else if bar_index > sSwBar
         int since = bar_index - sSwBar
@@ -357,7 +360,7 @@ if not sAct and uhvSell and flat and allowS and (not useZone or zoneBear)
         if high > sH
             sSw := true
             sSwBar := bar_index
-        else if close < sL
+        else if cancelOpp and close < sL
             sAct := false
 
 // Stop-entry mode: arm the stop order at the close of the sweep candle (active from the next candle)

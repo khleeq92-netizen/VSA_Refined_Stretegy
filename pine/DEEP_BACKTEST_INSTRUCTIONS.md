@@ -1,7 +1,7 @@
 # Running the research strategy with Deep Backtesting (TradingView Premium)
 
-Defaults now follow the rules rebuilt from your 19-Nov example (v5): the UHV candle is the volume peak of the climax,
-the sweep of the UHV extreme is required, entry is a stop order at the UHV extreme, SL 160 pips, half off at 120 pips,
+Defaults follow the rules rebuilt from your chart examples (v7): the UHV candle is the volume peak of the climax,
+the sweep of the UHV extreme is required, entry after a candle CLOSES beyond the opposite UHV extreme, SL 160 pips, half off at 120 pips,
 rest at 2 × SL, all sessions.
 
 1. Open `OANDA:XAUUSD`, timeframe **5m**.
