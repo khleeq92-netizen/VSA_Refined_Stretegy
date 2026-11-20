@@ -99,3 +99,10 @@ UHV candle and the CISD candle (its high for buys / low for sells; the open is t
 The conclusions are unchanged: BUY loses in this bearish sample and the SELL mirror is positive in both halves, but
 neither is statistically significant. Using the CISD candle's high (instead of its open) makes entries slightly later
 and slightly worse. v2 (zone-filtered) is unaffected in practice: 6 BUY / 8 SELL trades.
+
+---
+# Sweep timing (trader clarification: "anywhere within the range")
+The sweep of the UHV extreme may come at any time while price stays inside the UHV candle's range. The setup dies
+if a candle closes beyond the opposite UHV extreme first (practical cap: 288 bars = 1 day). Tested windows of
+6 / 24 / 48 / 96 / 288 bars: results are identical or nearly so (`v2_sweep_window.csv`). Sweeps almost always happen
+within 6 candles, or price breaks out the other way first. This rule does not change trade frequency or results.

@@ -5,7 +5,8 @@ BUY
   2. Background "at the bottom": the BG_N (3) candles immediately before it are also red.
   3. Location: the UHV candle overlaps an active higher-timeframe bullish FVG or demand zone (H1 / H4).
      A red UHV candle anywhere else (e.g. at the top) is ignored.
-  4. A later candle trades BELOW the UHV low (sweep of the UHV low), within W_SWEEP bars.
+  4. A later candle trades BELOW the UHV low (sweep), any time while price is still inside the UHV
+     range (no close above the UHV high first). Capped at 288 bars (1 day).
   5. A LATER candle (not the sweep candle) is bullish and closes ABOVE the UHV high
      (and above the CISD level when the CISD variant is on), within W_TRIG bars of the sweep.
   6. Entry next bar open. SL = lowest low since the UHV candle - $0.10. TP 50% @1R, rest @2R.
@@ -87,7 +88,7 @@ def zone_hits(d, Z, side):
 
 
 def run(d, f, side, zone_kinds=("fvg_H1", "fvg_H4", "ob_H1"), use_zone=True, bg_n=3, uhv_mult=1.75,
-        vol_n=10, big=0.0, use_cisd=False, w_sweep=6, w_trig=12, sweep_next_only=False, strong_body=0.0,
+        vol_n=10, big=0.0, use_cisd=False, w_sweep=288, w_trig=12, sweep_next_only=False, strong_body=0.0,
         sessions=("NY", "Overlap"), r_targets=(1.0, 2.0), partial=0.5, zcache={}):
     o, h, l, c, v = (d[x].values for x in ("open", "high", "low", "close", "volume"))
     n = len(d); s = 1 if side == "BUY" else -1
