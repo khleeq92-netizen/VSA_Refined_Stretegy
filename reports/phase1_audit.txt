@@ -1,0 +1,72 @@
+bars analysed 19215 2026-08-16 22:00:00+00:00 2026-11-20 20:40:00+00:00
+
+## 1. Volume by session (OANDA tick volume)
+         bars  med_vol  p95_vol  med_atr  med_range
+session                                            
+Asia     6780   1759.5   5221.6      3.9        3.8
+London   4980   2025.0   4060.5      4.0        3.7
+NY       4455   2156.0   5944.7      4.0        3.3
+Overlap  3000   4247.0   9575.0      6.1        6.1
+
+## 2. Hour-of-day (UTC) median volume
+{0: 2221.0, 1: 3570.0, 2: 2391.0, 3: 1693.0, 4: 1212.0, 5: 1910.0, 6: 2504.0, 7: 2131.0, 8: 2184.0, 9: 1932.0, 10: 1723.0, 11: 1818.0, 12: 2776.0, 13: 4686.0, 14: 4940.0, 15: 3912.0, 16: 2861.0, 17: 2371.0, 18: 2120.0, 19: 2190.0, 20: 1001.0, 21: 934.0, 22: 650.0, 23: 882.0}
+
+## 3. Does a fixed volume threshold work? share of bars above fixed thresholds by session
+5000 {'Asia': 5.7, 'London': 1.8, 'NY': 8.5, 'Overlap': 37.3}
+8000 {'Asia': 1.3, 'London': 0.1, 'NY': 1.9, 'Overlap': 10.1}
+10000 {'Asia': 0.4, 'London': 0.0, 'NY': 1.2, 'Overlap': 3.9}
+share of bars rv20>=2 by session {'Asia': 10.1, 'London': 2.3, 'NY': 2.1, 'Overlap': 8.8}
+share of bars rv>=2 (TOD-normalised composite) by session {'Asia': 5.0, 'London': 2.0, 'NY': 4.6, 'Overlap': 4.9}
+
+## 4. Volume vs spread relationship (Spearman) 0.726 rv vs rs 0.485
+
+## 5. Regime share of bars {'Range': 0.633, 'Bear': 0.226, 'Bull': 0.141}
+
+## 6. Forward response of VSA signals (entry next open; r = move in ATR in signal direction; hit1R = +1ATR before -1ATR within 24 bars)
+                     signal  dir     n  per_wk  hit1R  base_hit    r12    r24   t12  H1_r12  H2_r12
+               BuyingClimax SELL    99     7.3   45.5      52.0 -0.427 -1.081 -0.83  -0.157  -0.634
+        BuyingClimax | Bear SELL    18     1.3   61.1      52.0  0.491 -0.487  1.16   0.338   0.522
+       BuyingClimax | Range SELL    67     4.9   41.8      52.0 -0.904 -1.635 -1.72  -1.253  -0.586
+                   Upthrust SELL    43     3.2   37.2      52.0  0.126 -0.108  0.23   0.154   0.109
+           Upthrust | Range SELL    29     2.1   34.5      52.0 -0.727 -0.863 -1.43  -1.059  -0.553
+                   NoDemand SELL   304    22.4   58.8      52.0  0.120  0.146  0.93   0.209   0.050
+            NoDemand | Bull SELL    54     4.0   50.0      52.0 -0.332 -0.224 -1.03  -0.168  -0.509
+            NoDemand | Bear SELL    64     4.7   68.3      52.0  0.445 -0.005  1.46   0.244   0.611
+           NoDemand | Range SELL   186    13.7   58.2      52.0  0.139  0.306  0.89   0.335   0.004
+          TestOfDemand_fail SELL   428    31.5   53.4      52.0  0.189  0.342  1.73   0.344   0.052
+   TestOfDemand_fail | Bull SELL    52     3.8   51.9      52.0  0.456  0.375  1.36   0.339   0.592
+   TestOfDemand_fail | Bear SELL    95     7.0   51.1      52.0  0.098  0.345  0.35   0.192   0.033
+  TestOfDemand_fail | Range SELL   281    20.7   54.4      52.0  0.171  0.334  1.41   0.389  -0.028
+                BearWRB_UHV SELL   154    11.3   42.2      52.0 -0.466 -0.193 -1.53   0.021  -0.830
+         BearWRB_UHV | Bull SELL    15     1.1   40.0      52.0  0.737  0.692  0.60   1.430  -0.055
+         BearWRB_UHV | Bear SELL    44     3.2   38.6      52.0 -0.398  0.605 -0.63  -0.632  -0.289
+        BearWRB_UHV | Range SELL    95     7.0   44.2      52.0 -0.687 -0.702 -1.97  -0.028  -1.255
+              SellingClimax  BUY   128     9.4   51.6      47.0  0.647  0.060  1.86   0.034   1.188
+       SellingClimax | Bear  BUY    40     2.9   50.0      47.0  0.837 -0.481  1.36   0.525   1.024
+      SellingClimax | Range  BUY    81     6.0   49.4      47.0  0.687  0.337  1.64  -0.073   1.466
+                     Spring  BUY    57     4.2   49.1      47.0 -0.762 -1.105 -1.77  -0.409  -1.057
+              Spring | Bear  BUY    20     1.5   45.0      47.0 -1.193 -1.138 -1.49  -0.905  -1.317
+             Spring | Range  BUY    34     2.5   50.0      47.0 -0.798 -1.518 -1.64  -0.870  -0.716
+                   NoSupply  BUY   320    23.6   43.5      47.0 -0.445 -0.659 -3.79  -0.451  -0.439
+            NoSupply | Bull  BUY    54     4.0   50.0      47.0 -0.118 -0.940 -0.41  -0.114  -0.124
+            NoSupply | Bear  BUY    59     4.3   49.2      47.0 -0.322 -0.357 -1.01  -0.176  -0.445
+           NoSupply | Range  BUY   207    15.3   40.2      47.0 -0.564 -0.672 -4.09  -0.642  -0.501
+               TestOfSupply  BUY   425    31.3   45.4      47.0 -0.191 -0.303 -1.59  -0.223  -0.167
+        TestOfSupply | Bull  BUY    59     4.3   47.5      47.0 -0.464 -1.315 -1.18  -0.774  -0.144
+        TestOfSupply | Bear  BUY    97     7.1   54.6      47.0  0.159  0.350  0.58   0.493  -0.013
+       TestOfSupply | Range  BUY   269    19.8   41.6      47.0 -0.257 -0.317 -1.90  -0.283  -0.237
+             StoppingVolume  BUY    65     4.8   58.5      47.0  0.764  0.316  1.66   0.599   0.874
+      StoppingVolume | Bear  BUY    20     1.5   55.0      47.0  0.428 -1.208  0.58   0.553   0.387
+     StoppingVolume | Range  BUY    40     2.9   57.5      47.0  0.851  0.551  1.39   0.753   0.924
+                BullWRB_UHV  BUY   187    13.8   44.1      47.0  0.364  0.605  1.29   0.438   0.310
+         BullWRB_UHV | Bull  BUY    21     1.5   47.6      47.0  1.027  1.052  1.22   0.174   1.966
+         BullWRB_UHV | Bear  BUY    54     4.0   47.2      47.0 -0.202  0.262 -0.46   0.581  -0.662
+        BullWRB_UHV | Range  BUY   112     8.3   42.0      47.0  0.512  0.683  1.31   0.439   0.567
+          BASELINE all bars  BUY 19215  1415.8   47.0      47.0 -0.114 -0.208 -5.70  -0.064  -0.158
+            BASELINE | Bull  BUY  2707   199.5   49.4      47.0 -0.137 -0.209 -2.54  -0.063  -0.237
+            BASELINE | Bear  BUY  4345   320.2   46.9      47.0 -0.130 -0.288 -3.12  -0.057  -0.182
+           BASELINE | Range  BUY 12163   896.2   46.6      47.0 -0.102 -0.179 -4.10  -0.067  -0.134
+          BASELINE all bars SELL 19215  1415.8   52.0      52.0  0.114  0.208  5.70   0.064   0.158
+            BASELINE | Bull SELL  2707   199.5   49.7      52.0  0.137  0.209  2.54   0.063   0.237
+            BASELINE | Bear SELL  4345   320.2   52.1      52.0  0.130  0.288  3.12   0.057   0.182
+           BASELINE | Range SELL 12163   896.2   52.5      52.0  0.102  0.179  4.10   0.067   0.134
