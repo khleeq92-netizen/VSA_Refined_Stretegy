@@ -63,7 +63,7 @@ def run(side, entry="stop", sessions=None, sl_p=160, tp1_p=120, tp2_mult=2.0, be
         else:
             pnl += (1 - part if got1 else 1) * (C[k] - e)
         pnl -= 0.40
-        out.append(dict(side=side, uhv=d.index[u], entry_time=d.index[t], entry=s * e, session=sess[t],
+        out.append(dict(side=side, u=u, sw=sw, t=t, uhv=d.index[u], entry_time=d.index[t], entry=s * e, session=sess[t],
                         pips=pnl / 0.1, tp1_hit=got1, mae_pips=mae / 0.1, why=why))
         i = k + 1
     return pd.DataFrame(out)

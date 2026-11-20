@@ -65,6 +65,13 @@ useCisd   = input.bool(false, "Require close beyond the CISD candle too (close e
 cisdRef   = input.string("High/Low", "CISD candle level", options = ["High/Low", "Open"], group = gS)
 slBuf     = input.float(0.10, "Structural SL buffer ($)", step = 0.05, group = gS)
 
+// ───────── Quality filters (research candidates — off by default; test them as separate Deep Backtest runs)
+gQ = "Quality filters"
+minRngB   = input.float(0.0, "BUY: UHV candle range >= x ATR(20) (0 = off; research: 2.0)", step = 0.25, group = gQ)
+minRngS   = input.float(0.0, "SELL: UHV candle range >= x ATR(20) (0 = off)", step = 0.25, group = gQ)
+skipOvl   = input.bool(false, "Skip entries in the London–New York overlap", group = gQ,
+     tooltip = "Overlap = London 08:00–16:30 AND New York 08:00–17:00 local times (DST-aware).")
+
 // ───────── Higher-timeframe zone filter
 gZ = "HTF zone filter (UHV candle must overlap an active zone)"
 useZone   = input.bool(false, "Require HTF zone", group = gZ)
@@ -217,7 +224,7 @@ zoneBear = pickBig ? hitBear : hitBear[1]
 
 // ═════════ Common filters
 inDate  = time >= startT and time < endT
-inSess  = sessMode == "All sessions" or not na(time(timeframe.period, custSess, custTZ))
+inSessRaw = sessMode == "All sessions" or not na(time(timeframe.period, custSess, custTZ))
 flat    = strategy.position_size == 0
 allowB  = dirMode != "Sell only"
 allowS  = dirMode != "Buy only"
@@ -225,6 +232,12 @@ stopEnt = entryMode == "Break of UHV extreme (stop order)"
 fixedX  = exitMode == "Fixed pips"
 fixRisk = slPips * pipSize
 toTicks(float px) => math.round(px / syminfo.mintick)
+atr20   = ta.sma(ta.tr(true), 20)[1]
+uRngAtr = (high[uOff] - low[uOff]) / atr20[uOff]
+inLon   = not na(time(timeframe.period, "0800-1630", "Europe/London"))
+inNY    = not na(time(timeframe.period, "0800-1700", "America/New_York"))
+ovlOK   = not (skipOvl and inLon and inNY)
+inSess  = inSessRaw and ovlOK
 
 // CISD candle: first candle of the against-colour run ending at the UHV candle (inside candle -> mother candle)
 f_cisd(bool isBuy, int off) =>
@@ -297,7 +310,7 @@ if bAct and bar_index > bU
                     f_orders(true, close, bLow - slBuf, false)
                 bAct := false
 
-if not bAct and uhvBuy and flat and allowB and (not useZone or zoneBull)
+if not bAct and uhvBuy and flat and allowB and (not useZone or zoneBull) and uRngAtr >= minRngB
     bAct := true
     bSw := false
     bU := bar_index - uOff
@@ -348,7 +361,7 @@ if sAct and bar_index > sU
                     f_orders(false, close, sHigh + slBuf, false)
                 sAct := false
 
-if not sAct and uhvSell and flat and allowS and (not useZone or zoneBear)
+if not sAct and uhvSell and flat and allowS and (not useZone or zoneBear) and uRngAtr >= minRngS
     sAct := true
     sSw := false
     sU := bar_index - uOff
