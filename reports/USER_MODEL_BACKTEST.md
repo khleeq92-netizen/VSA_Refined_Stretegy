@@ -59,3 +59,25 @@ Typical stop = **2.5 × ATR** (~$10–11), because the stop sits beyond a large 
 ## Not yet possible with this data
 Bull and range-regime validation, walk-forward over multiple years, and statistically significant conclusions.
 Requires TradingView Deep Backtesting of a Pine `strategy()` implementation on OANDA:XAUUSD.
+
+---
+# Model v2: refined rules (red UHV at the bottom inside a zone / green UHV at the top)
+
+Code: `research/backtest_v2.py`. Results: `v2_results.csv` / `v2_results.txt`. Trades: `v2_trade_log.csv`.
+Rules: UHV ≥ 1.75 × the prior-10-bar average; it must be the 4th+ consecutive candle against the trade (3 before it);
+it must overlap an active H1/H4 FVG or H1 order block; a later candle sweeps the UHV extreme within 6 bars; a candle
+after the sweep closes beyond the opposite UHV extreme within 12 bars; trigger in NY 08:00–17:00 local time.
+SL beyond the lowest low (highest high) since the UHV candle; 50% @1R, rest @2R.
+
+| Variant | BUY n / avg R | SELL n / avg R |
+|---|---|---|
+| As described (US session) | 6 / −0.19 | 8 / −0.19 |
+| All sessions | 22 / −0.42 | 22 / +0.11 |
+| No zone filter | 10 / −0.28 | 12 / −0.19 |
+| No 3-candle background | 21 / −0.26 | 28 / −0.12 |
+| No zone, no background | 45 / −0.27 | 71 / −0.03 |
+| + CISD close required | 1 / — | 4 / −0.35 |
+
+**Conclusion:** as described, the model fires only about 0.5–0.6 times per week per side in the US session. Fourteen
+trades in 13.5 weeks cannot show whether it has an edge. Every number above is within random noise. Validation
+requires the multi-year Deep Backtest.
