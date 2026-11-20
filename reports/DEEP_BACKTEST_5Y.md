@@ -26,3 +26,26 @@ Data `data/deep_backtest/run_5y.csv`; analysis `research/analyze_5y.py`.
 | London–NY overlap | 157 | 52.9 | +2.9 | 1.07 | 66.7 / 1.24 |
 | NY after London close | 17 | 82.4 | +4.0 | 2.72 | 87.5 / 3.55 |
 Hours to watch (IST): 06:00–06:59 best (+6.5R, 59 trades); 07:00–08:59 worst (−5.5R, 68 trades); 12:00–12:59 weak (−3.5R, 27 trades).
+
+---
+# Run: ATR-multiple exits, BUY only, 2023-01 → 2026-11 (`data/deep_backtest/run_2023_now.csv`)
+
+| Year | Trades | Win % | Total R | PF | Median SL (pips) | Time exits |
+|---|---|---|---|---|---|---|
+| 2023 | 62 | 58.1 | −4.2 | 0.82 | 46 | 11% |
+| 2024 | 63 | 60.3 | −4.8 | 0.82 | 63 | 3% |
+| 2025 | 60 | 68.3 | +7.2 | 1.43 | 114 | 10% |
+| 2026 | 55 | 67.3 | +7.5 | 1.50 | 210 | 13% |
+| All | 240 | 63.3 | +5.7 | 1.07 | 83 | 9% |
+
+ATR exits removed the time-exit problem but did not rescue 2023–24 (fixed pips, same period: PF 1.22 overall).
+The setup itself has no edge in quieter years with all sessions included.
+
+Session filters (BUY), checked in both runs:
+| Filter | ATR run 2023–26 | Fixed-pip run 2021–26 |
+|---|---|---|
+| none | PF 1.07, 240 tr | PF 1.07, 400 tr |
+| skip 07:00–08:59 IST | PF 1.22 (2023–24 0.88, 2025–26 1.82) | PF 1.16 |
+| **skip Asia session** | **PF 1.38, 67% win, DD 7.7R (2023–24 1.16, 2025–26 1.70)** | PF 1.10 |
+| London + NY-after-London only | PF 1.92, 77% win, 52 tr | PF 1.15 |
+Pine default now: skip Asia ON (candidate; must be confirmed on 2021–22, which this filter was not chosen on).
