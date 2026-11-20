@@ -1,0 +1,13 @@
+side,model,n,per_wk,tp1_hit,net_win,avg_pips,total,maxDD,H1_tp1,H2_tp1,H1_avg,H2_avg
+BUY,"current rules | 50% @100, rest @320, BE",46,3.4,61,63,-8.1,-374,1196,60,62,3.3,-16.9
+BUY,"current rules | 50% @100, rest @320, no BE",46,3.4,61,41,-8.6,-396,1270,60,62,6.7,-20.4
+BUY,current rules | 100% @100 (single target),46,3.4,61,63,0.9,40,920,60,62,-8.0,7.7
+BUY,"UHV range >= 2 ATR | 50% @100, rest @320, BE",19,1.4,79,84,40.9,778,164,88,73,74.7,16.4
+BUY,"UHV range >= 2 ATR | 50% @100, rest @320, no BE",19,1.4,79,42,29.6,563,290,88,73,84.6,-10.4
+BUY,UHV range >= 2 ATR | 100% @100 (single target),19,1.4,79,84,57.3,1088,164,88,73,63.5,52.8
+SELL,"current rules | 50% @100, rest @320, BE",43,3.2,63,63,13.4,575,698,65,61,16.4,10.7
+SELL,"current rules | 50% @100, rest @320, no BE",42,3.1,62,45,19.4,814,580,63,61,29.9,10.7
+SELL,current rules | 100% @100 (single target),44,3.3,61,61,1.3,57,956,62,61,4.6,-1.8
+SELL,"vol >= 2.5x, no overlap | 50% @100, rest @320, BE",21,1.6,71,71,39.4,827,328,70,73,31.1,46.9
+SELL,"vol >= 2.5x, no overlap | 50% @100, rest @320, no BE",21,1.6,71,52,59.5,1250,362,70,73,57.4,61.5
+SELL,"vol >= 2.5x, no overlap | 100% @100 (single target)",21,1.6,71,71,29.4,617,328,70,73,34.1,25.1
