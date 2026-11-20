@@ -1,17 +1,16 @@
 // This Pine Script® code is subject to the terms of the Mozilla Public License 2.0
 // UHV Sweep Reversal — RESEARCH strategy for Deep Backtesting on OANDA:XAUUSD M5.
-// It reproduces the Python research model (research/backtest_v2.py + research/uhv_indicator.py).
-// Purpose: validation over many years. It is NOT a validated live-trading system.
+// Mirrors the Python research engine (research/backtest_v5.py and research/backtest_v2.py).
+// Purpose: multi-year validation. It is NOT a validated live-trading system.
 //
-// BUY  : red UHV candle at exhaustion (your indicator's Part-4 rules) -> later candle sweeps the UHV low
-//        (while price is still inside the UHV range) -> a candle AFTER the sweep is bullish and closes above
-//        the UHV high (and above the CISD candle when CISD is on) -> enter next bar open.
-//        SL = lowest low since the UHV candle - buffer. 50% at TP1 (1R), rest at TP2 (2R).
-// SELL : exact mirror (green UHV at the top, sweep of the UHV high, bearish close below the UHV low).
-// All signals are computed on CONFIRMED bars; higher-timeframe zones use completed HTF candles only.
-//
-// For results to match the research, run BUY-only and SELL-only as separate backtests
-// (the Python engine tests each side independently).
+// Default setup (rebuilt from the trader's 19-Nov-2026 example):
+//  BUY : selling climax in the lower part of the range -> the UHV candle is the VOLUME PEAK of that climax
+//        (red, volume >= 2x avg, higher than the 2 candles before and the candle after) -> a later candle
+//        sweeps the UHV low -> buy-stop at UHV high + $0.10 for 12 bars -> SL 160 pips, 50% at 120 pips,
+//        rest at 2 x SL. 1 pip = $0.10.
+//  SELL: exact mirror.
+// All signals use confirmed bars. Higher-timeframe zones use completed HTF candles only (no repainting).
+// Run BUY-only and SELL-only as separate backtests to match the research.
 //@version=6
 strategy("UHV Sweep Reversal [research]", overlay = true, initial_capital = 100000,
      default_qty_type = strategy.fixed, default_qty_value = 1, pyramiding = 0,
@@ -26,15 +25,18 @@ dirMode   = input.string("Buy only", "Direction", options = ["Buy only", "Sell o
 startT    = input.time(timestamp("2021-01-01T00:00:00"), "Backtest start", group = gG)
 endT      = input.time(timestamp("2030-01-01T00:00:00"), "Backtest end", group = gG)
 riskUSD   = input.float(100, "Risk per trade ($) — profit / this = R", minval = 1, group = gG)
-sessMode  = input.string("US session", "Trade in", options = ["US session", "All sessions"], group = gG)
-usSess    = input.session("0800-1700", "US session (New York time)", group = gG)
+sessMode  = input.string("All sessions", "Trade in", options = ["All sessions", "Custom session"], group = gG)
+custSess  = input.session("0800-1700", "Custom session", group = gG)
+custTZ    = input.string("America/New_York", "Custom session time zone", options = ["America/New_York", "Europe/London", "Asia/Kolkata", "Asia/Tokyo", "UTC"], group = gG)
 
-// ───────── UHV detector (from your indicator guide, Part 4)
+// ───────── UHV detector (your indicator guide, Part 4)
 gU = "UHV detector"
+uhvPick   = input.string("Volume peak", "Which candle is the UHV", options = ["Volume peak", "Big candle"], group = gU,
+     tooltip = "Volume peak: the highest-volume candle of the climax (body size not required) — matches your 19-Nov example. Big candle: your indicator's Part 4 rules incl. body >= 1.2x.")
 vmBuy     = input.float(2.0, "BUY UHV multiplier (x avg volume)", step = 0.1, group = gU)
 vmSell    = input.float(2.0, "SELL UHV multiplier (x avg volume)", step = 0.1, group = gU)
 nAvg      = input.int(40, "Lookback for volume / size averages", group = gU)
-bodyK     = input.float(1.2, "Body >= x average body", step = 0.1, group = gU)
+bodyK     = input.float(1.2, "Body >= x average body (Big candle only)", step = 0.1, group = gU)
 rangeK    = input.float(1.2, "Range >= x average range", step = 0.1, group = gU)
 posN      = input.int(50, "Range lookback for location test", group = gU)
 posMax    = input.float(0.65, "BUY: max position in range (0=low,1=high); SELL uses 1 - this", step = 0.05, group = gU)
@@ -50,19 +52,19 @@ emaN      = input.int(50, "Background EMA length", group = gU)
 bgShare   = input.float(0.55, "Background colour share", step = 0.05, group = gU)
 bgNeed    = input.int(2, "Background tests that must pass (of 3)", minval = 1, maxval = 3, group = gU)
 
-// ───────── Setup / trigger
-gS = "Setup and trigger"
-sweepMax  = input.int(288, "Max bars from UHV to sweep (setup dies earlier if price closes beyond the other UHV extreme)", group = gS)
-trigMax   = input.int(12, "Max bars from sweep to trigger", group = gS)
-useCisd   = input.bool(false, "Require close beyond the CISD candle too", group = gS)
+// ───────── Setup / entry
+gS = "Setup and entry"
+entryMode = input.string("Break of UHV extreme (stop order)", "Entry", options = ["Break of UHV extreme (stop order)", "Candle close beyond"], group = gS)
+sweepMax  = input.int(288, "Max bars from UHV to sweep", group = gS)
+trigMax   = input.int(12, "Max bars from sweep to entry", group = gS)
+entBuf    = input.float(0.10, "Stop-order buffer beyond UHV extreme ($)", step = 0.05, group = gS)
+useCisd   = input.bool(false, "Require close beyond the CISD candle too (close entry only)", group = gS)
 cisdRef   = input.string("High/Low", "CISD candle level", options = ["High/Low", "Open"], group = gS)
-minBody   = input.float(0.0, "Trigger candle min body % of range (0 = off)", step = 0.1, group = gS)
-slBuf     = input.float(0.10, "SL buffer beyond the extreme ($)", step = 0.05, group = gS)
-minRisk   = input.float(0.20, "Skip trades with risk below ($)", step = 0.05, group = gS)
+slBuf     = input.float(0.10, "Structural SL buffer ($)", step = 0.05, group = gS)
 
 // ───────── Higher-timeframe zone filter
 gZ = "HTF zone filter (UHV candle must overlap an active zone)"
-useZone   = input.bool(false, "Require HTF zone", group = gZ, tooltip = "Off by default: in the Aug-Nov 2026 research sample it reduced trades without improving results. Test both.")
+useZone   = input.bool(false, "Require HTF zone", group = gZ)
 zM15F     = input.bool(true, "M15 FVG", group = gZ, inline = "z1")
 zH1F      = input.bool(true, "H1 FVG", group = gZ, inline = "z1")
 zH4F      = input.bool(true, "H4 FVG", group = gZ, inline = "z1")
@@ -73,26 +75,28 @@ zoneDays  = input.int(5, "Zone max age (days)", group = gZ)
 
 // ───────── Exits
 gX = "Exits"
-tp1R      = input.float(1.0, "TP1 (R)", step = 0.25, group = gX)
-tp2R      = input.float(2.0, "Final TP (R)", step = 0.25, group = gX)
-tp1Pct    = input.float(50, "% closed at TP1 (0 = single target at final TP)", minval = 0, maxval = 100, group = gX)
-maxHold   = input.int(96, "Time exit after N bars", group = gX)
-exitMode  = input.string("Structural (R)", "Exit mode", options = ["Structural (R)", "Fixed pips"], group = gX,
-     tooltip = "Structural: SL beyond the sweep extreme, TPs in R. Fixed pips: your plan, e.g. SL 150 pips, TP1 120 pips, final TP = Final TP (R) x SL.")
+exitMode  = input.string("Fixed pips", "Exit mode", options = ["Fixed pips", "Structural (R)"], group = gX,
+     tooltip = "Fixed pips: SL / TP1 in pips, final TP = Final TP (R) x SL. Structural: SL beyond the sweep extreme, TPs in R.")
 pipSize   = input.float(0.10, "Pip size ($) — XAUUSD 1 pip = 0.10", step = 0.01, group = gX)
-slPips    = input.float(150, "Fixed SL (pips)", group = gX)
+slPips    = input.float(160, "Fixed SL (pips)", group = gX)
 tp1Pips   = input.float(120, "Fixed TP1 (pips)", group = gX)
+tp1R      = input.float(1.0, "Structural TP1 (R)", step = 0.25, group = gX)
+tp2R      = input.float(2.0, "Final TP (R)", step = 0.25, group = gX)
+tp1Pct    = input.float(50, "% closed at TP1 (100 = single target at TP1)", minval = 0, maxval = 100, group = gX)
 useBE     = input.bool(false, "Move SL to breakeven after TP1", group = gX)
+maxHold   = input.int(96, "Time exit after N bars", group = gX)
 
-// ═════════ UHV detection (confirmed bar)
+// ═════════ UHV detection
 vAvg   = ta.sma(volume, nAvg)
 bodyV  = math.abs(close - open)
-bigOK  = bodyV >= bodyK * ta.sma(bodyV, nAvg) and (high - low) >= rangeK * ta.sma(high - low, nAvg)
+rangeOK = (high - low) >= rangeK * ta.sma(high - low, nAvg)
+bodyOK  = bodyV >= bodyK * ta.sma(bodyV, nAvg)
 hhP    = ta.highest(high, posN)
 llP    = ta.lowest(low, posN)
 posR   = hhP > llP ? (close - llP) / (hhP - llP) : 0.5
 excV   = volume >= excK * vAvg or volume >= ta.highest(volume, excN)
 emaV   = ta.ema(close, emaN)
+pickBig = uhvPick == "Big candle"
 
 f_uhv(bool isBuy, float vm) =>
     bool  against = isBuy ? close < open : close > open
@@ -105,10 +109,15 @@ f_uhv(bool isBuy, float vm) =>
     float t3 = math.sum(against ? 1.0 : 0.0, bgN) / bgN >= bgShare ? 1 : 0
     bool  ovOK = useOv and excV and (t1 + t2 + t3) >= bgNeed and cnt >= ovReds
     bool  locOK = isBuy ? posR <= posMax : posR >= 1 - posMax
-    against and volume > vm * vAvg and bigOK and locOK and (normalOK or ovOK)
+    against and volume > vm * vAvg and rangeOK and (pickBig ? bodyOK : true) and locOK and (normalOK or ovOK)
 
-uhvBuy  = f_uhv(true, vmBuy)
-uhvSell = f_uhv(false, vmSell)
+rawBuy  = f_uhv(true, vmBuy)
+rawSell = f_uhv(false, vmSell)
+// Volume peak: candle [1] had more volume than the 2 before it and than the current candle (confirmed now)
+peakPrev = volume[1] >= volume[2] and volume[1] >= volume[3] and volume < volume[1]
+uhvBuy   = pickBig ? rawBuy  : (rawBuy[1]  and peakPrev)
+uhvSell  = pickBig ? rawSell : (rawSell[1] and peakPrev)
+uOff     = pickBig ? 0 : 1          // bars back from the current bar to the UHV candle
 
 // ═════════ HTF zones from COMPLETED higher-timeframe candles (lookahead_on + [1] offsets = no repaint)
 f_htf() =>
@@ -200,20 +209,24 @@ if useZone and array.size(zBot) > 0
             array.remove(zTop, i)
             array.remove(zSide, i)
             array.remove(zExp, i)
+zoneBull = pickBig ? hitBull : hitBull[1]
+zoneBear = pickBig ? hitBear : hitBear[1]
 
-// ═════════ Filters
+// ═════════ Common filters
 inDate  = time >= startT and time < endT
-inSess  = sessMode == "All sessions" or not na(time(timeframe.period, usSess, "America/New_York"))
+inSess  = sessMode == "All sessions" or not na(time(timeframe.period, custSess, custTZ))
 flat    = strategy.position_size == 0
 allowB  = dirMode != "Sell only"
 allowS  = dirMode != "Buy only"
-bodyPct = high > low ? math.abs(close - open) / (high - low) : 0.0
+stopEnt = entryMode == "Break of UHV extreme (stop order)"
+fixedX  = exitMode == "Fixed pips"
+fixRisk = slPips * pipSize
+toTicks(float px) => math.round(px / syminfo.mintick)
 
-// CISD candle: first candle of the against-colour run ending at the UHV candle; if it is an inside
-// candle, step back to its mother candle. Level = its high (BUY) / low (SELL), or its open.
-f_cisd(bool isBuy) =>
-    int j = 0
-    for k = 1 to 30
+// CISD candle: first candle of the against-colour run ending at the UHV candle (inside candle -> mother candle)
+f_cisd(bool isBuy, int off) =>
+    int j = off
+    for k = off + 1 to off + 30
         bool ag = isBuy ? close[k] < open[k] : close[k] > open[k]
         if not ag
             break
@@ -225,6 +238,26 @@ f_cisd(bool isBuy) =>
             break
     cisdRef == "Open" ? open[j] : (isBuy ? high[j] : low[j])
 
+// Places entry + exits. Fixed pips: exits are relative to the actual fill (profit/loss in ticks).
+f_orders(bool isLong, float entryPx, float structSL, bool asStop) =>
+    string id = isLong ? "L" : "S"
+    float  risk = fixedX ? fixRisk : math.abs(entryPx - structSL)
+    float  qty = riskUSD / risk
+    if asStop
+        strategy.entry(id, isLong ? strategy.long : strategy.short, qty = qty, stop = entryPx)
+    else
+        strategy.entry(id, isLong ? strategy.long : strategy.short, qty = qty)
+    if fixedX
+        int lossT = toTicks(fixRisk)
+        if tp1Pct > 0
+            strategy.exit(id + "-TP1", id, qty_percent = tp1Pct, profit = toTicks(tp1Pips * pipSize), loss = lossT)
+        strategy.exit(id + "-TP2", id, profit = toTicks(tp2R * fixRisk), loss = lossT)
+    else
+        float d = isLong ? 1.0 : -1.0
+        if tp1Pct > 0
+            strategy.exit(id + "-TP1", id, qty_percent = tp1Pct, limit = entryPx + d * tp1R * risk, stop = structSL)
+        strategy.exit(id + "-TP2", id, limit = entryPx + d * tp2R * risk, stop = structSL)
+
 // ═════════ BUY setup state machine
 var bool  bAct = false
 var bool  bSw = false
@@ -234,9 +267,9 @@ var float bH = na
 var float bL = na
 var float bLow = na
 var float bLvl = na
-bool goLong = false
-float longSL = na
 
+if bAct and not flat
+    bAct := false
 if bAct and bar_index > bU
     bLow := math.min(bLow, low)
     if not bSw
@@ -246,22 +279,35 @@ if bAct and bar_index > bU
         else if close > bH or bar_index - bU >= sweepMax
             bAct := false
     else if bar_index > bSwBar
-        if bar_index - bSwBar > trigMax
-            bAct := false
-        else if close > open and close > bLvl and bodyPct >= minBody
-            if inSess and inDate and flat and allowB and close - (bLow - slBuf) > minRisk
-                goLong := true
-                longSL := bLow - slBuf
-            bAct := false
+        int since = bar_index - bSwBar
+        if stopEnt
+            if since < trigMax and inSess and inDate and allowB and flat
+                f_orders(true, bH + entBuf, bLow - slBuf, true)
+            else if since >= trigMax
+                strategy.cancel("L")
+                bAct := false
+        else
+            if since > trigMax
+                bAct := false
+            else if close > open and close > bLvl
+                if inSess and inDate and flat and allowB
+                    f_orders(true, close, bLow - slBuf, false)
+                bAct := false
 
-if not bAct and uhvBuy and flat and allowB and (not useZone or hitBull)
+if not bAct and uhvBuy and flat and allowB and (not useZone or zoneBull)
     bAct := true
     bSw := false
-    bU := bar_index
-    bH := high
-    bL := low
-    bLow := low
-    bLvl := useCisd ? math.max(high, f_cisd(true)) : high
+    bU := bar_index - uOff
+    bH := high[uOff]
+    bL := low[uOff]
+    bLow := math.min(low[uOff], low)
+    bLvl := useCisd and not stopEnt ? math.max(bH, f_cisd(true, uOff)) : bH
+    if uOff == 1
+        if low < bL
+            bSw := true
+            bSwBar := bar_index
+        else if close > bH
+            bAct := false
 
 // ═════════ SELL setup state machine (mirror)
 var bool  sAct = false
@@ -272,9 +318,9 @@ var float sH = na
 var float sL = na
 var float sHigh = na
 var float sLvl = na
-bool goShort = false
-float shortSL = na
 
+if sAct and not flat
+    sAct := false
 if sAct and bar_index > sU
     sHigh := math.max(sHigh, high)
     if not sSw
@@ -284,83 +330,78 @@ if sAct and bar_index > sU
         else if close < sL or bar_index - sU >= sweepMax
             sAct := false
     else if bar_index > sSwBar
-        if bar_index - sSwBar > trigMax
-            sAct := false
-        else if close < open and close < sLvl and bodyPct >= minBody
-            if inSess and inDate and flat and allowS and (sHigh + slBuf) - close > minRisk
-                goShort := true
-                shortSL := sHigh + slBuf
-            sAct := false
+        int since = bar_index - sSwBar
+        if stopEnt
+            if since < trigMax and inSess and inDate and allowS and flat
+                f_orders(false, sL - entBuf, sHigh + slBuf, true)
+            else if since >= trigMax
+                strategy.cancel("S")
+                sAct := false
+        else
+            if since > trigMax
+                sAct := false
+            else if close < open and close < sLvl
+                if inSess and inDate and flat and allowS
+                    f_orders(false, close, sHigh + slBuf, false)
+                sAct := false
 
-if not sAct and uhvSell and flat and allowS and (not useZone or hitBear)
+if not sAct and uhvSell and flat and allowS and (not useZone or zoneBear)
     sAct := true
     sSw := false
-    sU := bar_index
-    sH := high
-    sL := low
-    sHigh := high
-    sLvl := useCisd ? math.min(low, f_cisd(false)) : low
+    sU := bar_index - uOff
+    sH := high[uOff]
+    sL := low[uOff]
+    sHigh := math.max(high[uOff], high)
+    sLvl := useCisd and not stopEnt ? math.min(sL, f_cisd(false, uOff)) : sL
+    if uOff == 1
+        if high > sH
+            sSw := true
+            sSwBar := bar_index
+        else if close < sL
+            sAct := false
 
-// ═════════ Orders (placed at the signal bar's close, filled at the next bar's open)
-var float slP = na
-var float tp1P = na
-var float tp2P = na
-var int   sigBar = na
+// Stop-entry mode: arm the stop order at the close of the sweep candle (active from the next candle)
+if bAct and bSw and stopEnt and bar_index == bSwBar and inSess and inDate and allowB and flat
+    f_orders(true, bH + entBuf, bLow - slBuf, true)
+if sAct and sSw and stopEnt and bar_index == sSwBar and inSess and inDate and allowS and flat
+    f_orders(false, sL - entBuf, sHigh + slBuf, true)
 
-if goLong and goShort
-    goShort := false   // "Both" mode: one position at a time, BUY wins a tie
-
-fixedX = exitMode == "Fixed pips"
-
-if goLong
-    float risk = fixedX ? slPips * pipSize : close - longSL
-    slP := close - risk
-    tp1P := fixedX ? close + tp1Pips * pipSize : close + tp1R * risk
-    tp2P := close + tp2R * risk
-    sigBar := bar_index
-    strategy.entry("L", strategy.long, qty = riskUSD / risk)
-    if tp1Pct > 0
-        strategy.exit("L-TP1", "L", qty_percent = tp1Pct, limit = tp1P, stop = slP)
-    strategy.exit("L-TP2", "L", limit = tp2P, stop = slP)
-    alert("UHV BUY: entry ~" + str.tostring(close, format.mintick) + " SL " + str.tostring(slP, format.mintick) +
-         " TP1 " + str.tostring(tp1P, format.mintick) + " TP2 " + str.tostring(tp2P, format.mintick), alert.freq_once_per_bar_close)
-
-if goShort
-    float risk = fixedX ? slPips * pipSize : shortSL - close
-    slP := close + risk
-    tp1P := fixedX ? close - tp1Pips * pipSize : close - tp1R * risk
-    tp2P := close - tp2R * risk
-    sigBar := bar_index
-    strategy.entry("S", strategy.short, qty = riskUSD / risk)
-    if tp1Pct > 0
-        strategy.exit("S-TP1", "S", qty_percent = tp1Pct, limit = tp1P, stop = slP)
-    strategy.exit("S-TP2", "S", limit = tp2P, stop = slP)
-    alert("UHV SELL: entry ~" + str.tostring(close, format.mintick) + " SL " + str.tostring(slP, format.mintick) +
-         " TP1 " + str.tostring(tp1P, format.mintick) + " TP2 " + str.tostring(tp2P, format.mintick), alert.freq_once_per_bar_close)
-
-// Breakeven after TP1: once part of the position is closed, move the remaining stop to the entry price
+// ═════════ Position management: breakeven after TP1, time exit, level lines
 var float entQty = 0.0
 var bool  beDone = false
+var int   fillBar = na
+var float slLine = na
+var float tpLine = na
 if strategy.position_size != 0 and nz(strategy.position_size[1]) == 0
     entQty := math.abs(strategy.position_size)
     beDone := false
-if useBE and tp1Pct > 0 and not beDone and strategy.position_size != 0 and math.abs(strategy.position_size) < entQty * 0.999
+    fillBar := bar_index
+    float ep = strategy.position_avg_price
+    float dd = strategy.position_size > 0 ? 1.0 : -1.0
+    float rk = fixedX ? fixRisk : math.abs(ep - (dd > 0 ? bLow - slBuf : sHigh + slBuf))
+    slLine := ep - dd * rk
+    tpLine := ep + dd * tp2R * rk
+if useBE and tp1Pct > 0 and tp1Pct < 100 and not beDone and strategy.position_size != 0 and math.abs(strategy.position_size) < entQty * 0.999
     beDone := true
-    slP := strategy.position_avg_price
+    slLine := strategy.position_avg_price
     if strategy.position_size > 0
-        strategy.exit("L-TP2", "L", limit = tp2P, stop = slP)
+        strategy.exit("L-TP2", "L", limit = tpLine, stop = slLine)
     else
-        strategy.exit("S-TP2", "S", limit = tp2P, stop = slP)
-
-if not flat and not na(sigBar) and bar_index - sigBar >= maxHold
+        strategy.exit("S-TP2", "S", limit = tpLine, stop = slLine)
+if not flat and not na(fillBar) and bar_index - fillBar >= maxHold
     strategy.close_all(comment = "time")
 
-// ═════════ Visuals
-inPos = not flat or goLong or goShort
-plot(inPos ? slP : na, "SL", color.red, 1, plot.style_linebr)
-plot(inPos ? tp1P : na, "TP1", color.new(color.green, 40), 1, plot.style_linebr)
-plot(inPos ? tp2P : na, "TP2", color.green, 2, plot.style_linebr)
-plotshape(uhvBuy and allowB, "UHV buy candle", shape.triangleup, location.belowbar, color.new(color.teal, 0), size = size.tiny)
-plotshape(uhvSell and allowS, "UHV sell candle", shape.triangledown, location.abovebar, color.new(color.maroon, 0), size = size.tiny)
+// ═════════ Alerts and visuals
+if bAct and bSw and bar_index == bSwBar
+    alert("UHV BUY setup armed: UHV low swept. Buy-stop / trigger level " + str.tostring(bH + entBuf, format.mintick), alert.freq_once_per_bar_close)
+if sAct and sSw and bar_index == sSwBar
+    alert("UHV SELL setup armed: UHV high swept. Sell-stop / trigger level " + str.tostring(sL - entBuf, format.mintick), alert.freq_once_per_bar_close)
+
+plot(not flat ? slLine : na, "SL", color.red, 1, plot.style_linebr)
+plot(not flat ? tpLine : na, "Final TP", color.green, 2, plot.style_linebr)
+plot(bAct and bSw ? bH + entBuf : na, "Buy trigger", color.new(color.teal, 30), 1, plot.style_linebr)
+plot(sAct and sSw ? sL - entBuf : na, "Sell trigger", color.new(color.maroon, 30), 1, plot.style_linebr)
+plotshape(uhvBuy and allowB, "UHV buy candle", shape.triangleup, location.belowbar, color.teal, offset = -uOff, size = size.tiny)
+plotshape(uhvSell and allowS, "UHV sell candle", shape.triangledown, location.abovebar, color.maroon, offset = -uOff, size = size.tiny)
 plotshape(bAct and bSw and bar_index == bSwBar, "Buy sweep", shape.xcross, location.belowbar, color.teal, size = size.tiny)
 plotshape(sAct and sSw and bar_index == sSwBar, "Sell sweep", shape.xcross, location.abovebar, color.maroon, size = size.tiny)
