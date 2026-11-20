@@ -106,3 +106,23 @@ The sweep of the UHV extreme may come at any time while price stays inside the U
 if a candle closes beyond the opposite UHV extreme first (practical cap: 288 bars = 1 day). Tested windows of
 6 / 24 / 48 / 96 / 288 bars: results are identical or nearly so (`v2_sweep_window.csv`). Sweeps almost always happen
 within 6 candles, or price breaks out the other way first. This rule does not change trade frequency or results.
+
+---
+# v3: zones on M15 / H1 / H4 (FVG + demand/supply) and a higher UHV threshold for sells
+
+Zones now include M15, H1 and H4 FVGs, plus M15, H1 and H4 demand/supply zones (last opposite candle before a ≥1.5×ATR
+displacement candle on that timeframe). Sell-side UHV thresholds of 1.75×, 2.0×, 2.5× and 3.0× were tested
+(`v3_zones_uhv.csv`, `v3_trade_log.csv`).
+
+| Variant | BUY n / avg R | SELL n / avg R |
+|---|---|---|
+| Old zones, US session | 6 / −0.19 | 8 / −0.19 |
+| M15+H1+H4 zones, UHV 1.75×, US session | 7 / −0.31 | 11 / −0.11 |
+| M15+H1+H4 zones, UHV 1.75×, all sessions | 29 / −0.27 | 34 / +0.20 |
+| SELL UHV 2.0×, all sessions | — | 18 / +0.02 |
+| SELL UHV 2.5×, all sessions | — | 9 / +0.27 |
+| SELL UHV 3.0×, all sessions | — | 4 / +0.02 |
+
+Findings: adding M15 zones barely raises trade count in the US session. The binding constraints are the 3-candle
+run and the sweep of the UHV extreme. A higher sell-side volume threshold cuts trades without clearly improving
+results; nothing here exceeds noise. Most zone hits come from M15 FVGs.

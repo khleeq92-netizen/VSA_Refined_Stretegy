@@ -36,35 +36,44 @@ def htf(d, rule):
     return b
 
 
-def zones(d, kinds=("fvg_H1", "fvg_H4", "ob_H1")):
-    """Return list of zones: dict(side, bot, top, avail, kind)."""
+TF = {"M15": "15min", "H1": "1h", "H4": "4h"}
+ALL_KINDS = ("fvg_M15", "fvg_H1", "fvg_H4", "ob_M15", "ob_H1", "ob_H4")
+
+
+def zones(d, kinds=ALL_KINDS):
+    """Zones on M15 / H1 / H4. dict(side, bot, top, avail, kind).
+    fvg_X: 3-candle fair value gap on timeframe X.
+    ob_X : demand (supply) zone = last red (green) X candle before an X displacement candle that is
+           bullish (bearish), range >= 1.5 x ATR14(X), and closes beyond that candle's high (low)."""
     Z = []
-    for tf, name in (("1h", "fvg_H1"), ("4h", "fvg_H4")):
-        if name not in kinds:
+    for name, rule in TF.items():
+        need_fvg, need_ob = f"fvg_{name}" in kinds, f"ob_{name}" in kinds
+        if not (need_fvg or need_ob):
             continue
-        b = htf(d, tf); h, l, a = b.high.values, b.low.values, b.avail.values
-        for k in range(2, len(b)):
-            if l[k] > h[k - 2]:
-                Z.append(dict(side=1, bot=h[k - 2], top=l[k], avail=a[k], kind=name))
-            if h[k] < l[k - 2]:
-                Z.append(dict(side=-1, bot=h[k], top=l[k - 2], avail=a[k], kind=name))
-    if "ob_H1" in kinds:
-        b = htf(d, "1h"); o, h, l, c, a = (b[x].values for x in ("open", "high", "low", "close", "avail"))
-        tr = np.maximum(h - l, np.maximum(abs(h - np.r_[np.nan, c[:-1]]), abs(l - np.r_[np.nan, c[:-1]])))
-        atr = pd.Series(tr).rolling(14).mean().shift(1).values
-        for k in range(15, len(b)):
-            if not np.isfinite(atr[k]) or (h[k] - l[k]) < 1.5 * atr[k]:
-                continue
-            if c[k] > o[k]:      # bullish displacement -> demand = last red candle before it
-                j = k - 1
-                while j > k - 6 and not (c[j] < o[j]): j -= 1
-                if c[j] < o[j] and c[k] > h[j]:
-                    Z.append(dict(side=1, bot=l[j], top=h[j], avail=a[k], kind="ob_H1"))
-            if c[k] < o[k]:
-                j = k - 1
-                while j > k - 6 and not (c[j] > o[j]): j -= 1
-                if c[j] > o[j] and c[k] < l[j]:
-                    Z.append(dict(side=-1, bot=l[j], top=h[j], avail=a[k], kind="ob_H1"))
+        b = htf(d, rule); o, h, l, c, a = (b[x].values for x in ("open", "high", "low", "close", "avail"))
+        if need_fvg:
+            for k in range(2, len(b)):
+                if l[k] > h[k - 2]:
+                    Z.append(dict(side=1, bot=h[k - 2], top=l[k], avail=a[k], kind=f"fvg_{name}"))
+                if h[k] < l[k - 2]:
+                    Z.append(dict(side=-1, bot=h[k], top=l[k - 2], avail=a[k], kind=f"fvg_{name}"))
+        if need_ob:
+            pc = np.r_[np.nan, c[:-1]]
+            tr = np.maximum(h - l, np.maximum(abs(h - pc), abs(l - pc)))
+            atr = pd.Series(tr).rolling(14).mean().shift(1).values
+            for k in range(15, len(b)):
+                if not np.isfinite(atr[k]) or (h[k] - l[k]) < 1.5 * atr[k]:
+                    continue
+                if c[k] > o[k]:
+                    j = k - 1
+                    while j > k - 6 and not (c[j] < o[j]): j -= 1
+                    if c[j] < o[j] and c[k] > h[j]:
+                        Z.append(dict(side=1, bot=l[j], top=h[j], avail=a[k], kind=f"ob_{name}"))
+                if c[k] < o[k]:
+                    j = k - 1
+                    while j > k - 6 and not (c[j] > o[j]): j -= 1
+                    if c[j] > o[j] and c[k] < l[j]:
+                        Z.append(dict(side=-1, bot=l[j], top=h[j], avail=a[k], kind=f"ob_{name}"))
     return Z
 
 
@@ -87,7 +96,7 @@ def zone_hits(d, Z, side):
     return out
 
 
-def run(d, f, side, zone_kinds=("fvg_H1", "fvg_H4", "ob_H1"), use_zone=True, bg_n=3, uhv_mult=1.75,
+def run(d, f, side, zone_kinds=ALL_KINDS, use_zone=True, bg_n=3, uhv_mult=1.75,
         vol_n=10, big=0.0, use_cisd=False, w_sweep=288, w_trig=12, sweep_next_only=False, strong_body=0.0,
         sessions=("NY", "Overlap"), r_targets=(1.0, 2.0), partial=0.5, zcache={}):
     o, h, l, c, v = (d[x].values for x in ("open", "high", "low", "close", "volume"))
