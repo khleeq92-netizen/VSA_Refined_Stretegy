@@ -23,7 +23,7 @@ strategy("UHV Sweep Reversal [research]", overlay = true, initial_capital = 1000
 
 // ───────── General
 gG = "General"
-dirMode   = input.string("Both", "Direction", options = ["Buy only", "Sell only", "Both"], group = gG,
+dirMode   = input.string("Buy only", "Direction", options = ["Buy only", "Sell only", "Both"], group = gG,
      tooltip = "Run Buy only and Sell only as separate backtests to match the research.")
 startT    = input.time(timestamp("2021-01-01T00:00:00"), "Backtest start", group = gG)
 endT      = input.time(timestamp("2030-01-01T00:00:00"), "Backtest end", group = gG)
@@ -88,7 +88,7 @@ zoneDays  = input.int(5, "Zone max age (days)", group = gZ)
 
 // ───────── Exits
 gX = "Exits"
-exitMode  = input.string("Fixed pips", "Exit mode", options = ["Fixed pips", "Structural (R)"], group = gX,
+exitMode  = input.string("ATR multiples", "Exit mode", options = ["ATR multiples", "Fixed pips", "Structural (R)"], group = gX,
      tooltip = "Fixed pips: SL / TP1 in pips, final TP = Final TP (R) x SL. Structural: SL beyond the sweep extreme, TPs in R.")
 pipSize   = input.float(0.10, "Pip size ($) — XAUUSD 1 pip = 0.10", step = 0.01, group = gX)
 slPips    = input.float(160, "Fixed SL (pips)", group = gX)
@@ -99,6 +99,14 @@ tp1PctB   = input.float(100, "BUY: % closed at TP1 (100 = single target)", minva
 tp1PctS   = input.float(50, "SELL: % closed at TP1 (rest runs to Final TP)", minval = 0, maxval = 100, group = gX)
 useBE     = input.bool(false, "Move SL to breakeven after TP1", group = gX)
 maxHold   = input.int(96, "Time exit after N bars", group = gX)
+slAtrK    = input.float(3.5, "ATR mode: SL = x ATR(20)  (3.5 ≈ 160 pips at 2026 volatility)", step = 0.25, group = gX)
+tp1AtrK   = input.float(2.25, "ATR mode: TP1 = x ATR(20) (2.25 ≈ 100 pips at 2026 volatility)", step = 0.25, group = gX)
+
+gR = "Regime filters"
+useTrend  = input.bool(false, "Daily trend filter: BUY only above daily SMA, SELL only below", group = gR)
+trendLen  = input.int(50, "Daily SMA length", group = gR)
+minAtrUSD = input.float(0.0, "Minimum M5 ATR(20) in $ to take a setup (0 = off)", step = 0.25, group = gR,
+     tooltip = "The 2021-2024 losses came from quiet markets. Example: 2.5 = skip setups when the average M5 range is below $2.50 (25 pips).")
 
 // ═════════ UHV detection
 vAvg   = ta.sma(volume, nAvg)
@@ -233,10 +241,14 @@ flat    = strategy.position_size == 0
 allowB  = dirMode != "Sell only"
 allowS  = dirMode != "Buy only"
 stopEnt = entryMode == "Break of UHV extreme (stop order)"
-fixedX  = exitMode == "Fixed pips"
-fixRisk = slPips * pipSize
+fixedX  = exitMode != "Structural (R)"          // fixed-distance exits (pips or ATR), placed relative to the fill
 toTicks(float px) => math.round(px / syminfo.mintick)
 atr20   = ta.sma(ta.tr(true), 20)[1]
+fixRisk = exitMode == "Fixed pips" ? slPips * pipSize : slAtrK * atr20
+tp1Dist = exitMode == "Fixed pips" ? tp1Pips * pipSize : tp1AtrK * atr20
+dSma    = request.security(syminfo.tickerid, "D", ta.sma(close, trendLen)[1], lookahead = barmerge.lookahead_on)
+regB    = (not useTrend or close > dSma) and atr20 >= minAtrUSD
+regS    = (not useTrend or close < dSma) and atr20 >= minAtrUSD
 uRngAtr = (high[uOff] - low[uOff]) / atr20[uOff]
 inLon   = not na(time(timeframe.period, "0800-1630", "Europe/London"))
 inNY    = not na(time(timeframe.period, "0800-1700", "America/New_York"))
@@ -271,7 +283,7 @@ f_orders(bool isLong, float entryPx, float structSL, bool asStop) =>
     if fixedX
         int lossT = toTicks(fixRisk)
         if pct > 0
-            strategy.exit(id + "-TP1", id, qty_percent = pct, profit = toTicks(tp1Pips * pipSize), loss = lossT)
+            strategy.exit(id + "-TP1", id, qty_percent = pct, profit = toTicks(tp1Dist), loss = lossT)
         strategy.exit(id + "-TP2", id, profit = toTicks(tp2R * fixRisk), loss = lossT)
     else
         float d = isLong ? 1.0 : -1.0
@@ -320,7 +332,7 @@ if bAct and bar_index > bU
                     firedB := true
                 bAct := false
 
-if not bAct and uhvBuy and flat and allowB and (not useZone or zoneBull) and uRngAtr >= minRngB
+if not bAct and uhvBuy and flat and allowB and (not useZone or zoneBull) and uRngAtr >= minRngB and regB
     bAct := true
     bSw := false
     bU := bar_index - uOff
@@ -371,7 +383,7 @@ if sAct and bar_index > sU
                     f_orders(false, close, sHigh + slBuf, false)
                 sAct := false
 
-if not sAct and uhvSell and flat and allowS and not firedB and (not useZone or zoneBear) and uRngAtr >= minRngS
+if not sAct and uhvSell and flat and allowS and not firedB and (not useZone or zoneBear) and uRngAtr >= minRngS and regS
     sAct := true
     sSw := false
     sU := bar_index - uOff
