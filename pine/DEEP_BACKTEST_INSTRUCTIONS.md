@@ -22,3 +22,13 @@ drawdown and losing streaks, and a check that 16 Aug – 20 Nov 2026 trades matc
 
 Known small differences from the Python engine: TP prices are computed from the signal candle's close (Python uses
 the next bar's open; gold M5 gaps are usually cents); while a setup is waiting, a newer UHV candle does not replace it.
+
+## Extra BUY runs: your fixed-pip exit plan (Exits → Exit mode = Fixed pips)
+
+| Run | Direction | Trade in | Fixed SL | Fixed TP1 | % at TP1 | Final TP (R) | Breakeven after TP1 | File |
+|---|---|---|---|---|---|---|---|---|
+| 5 | Buy only | US session | 150 | 120 | 50 | 2.0 | off | `run5_buy_pips.csv` |
+| 6 | Buy only | US session | 150 | 120 | 50 | 2.0 | on | `run6_buy_pips_be.csv` |
+| 7 | Buy only | US session | 150 | 120 | 100 (single TP) | — | off | `run7_buy_pips_tp120.csv` |
+
+For a single target of 120 pips, set "% closed at TP1" = 100. TP1 then closes the whole position.

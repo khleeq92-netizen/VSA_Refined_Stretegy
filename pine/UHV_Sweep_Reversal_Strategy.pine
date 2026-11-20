@@ -77,6 +77,12 @@ tp1R      = input.float(1.0, "TP1 (R)", step = 0.25, group = gX)
 tp2R      = input.float(2.0, "Final TP (R)", step = 0.25, group = gX)
 tp1Pct    = input.float(50, "% closed at TP1 (0 = single target at final TP)", minval = 0, maxval = 100, group = gX)
 maxHold   = input.int(96, "Time exit after N bars", group = gX)
+exitMode  = input.string("Structural (R)", "Exit mode", options = ["Structural (R)", "Fixed pips"], group = gX,
+     tooltip = "Structural: SL beyond the sweep extreme, TPs in R. Fixed pips: your plan, e.g. SL 150 pips, TP1 120 pips, final TP = Final TP (R) x SL.")
+pipSize   = input.float(0.10, "Pip size ($) — XAUUSD 1 pip = 0.10", step = 0.01, group = gX)
+slPips    = input.float(150, "Fixed SL (pips)", group = gX)
+tp1Pips   = input.float(120, "Fixed TP1 (pips)", group = gX)
+useBE     = input.bool(false, "Move SL to breakeven after TP1", group = gX)
 
 // ═════════ UHV detection (confirmed bar)
 vAvg   = ta.sma(volume, nAvg)
@@ -304,10 +310,12 @@ var int   sigBar = na
 if goLong and goShort
     goShort := false   // "Both" mode: one position at a time, BUY wins a tie
 
+fixedX = exitMode == "Fixed pips"
+
 if goLong
-    float risk = close - longSL
-    slP := longSL
-    tp1P := close + tp1R * risk
+    float risk = fixedX ? slPips * pipSize : close - longSL
+    slP := close - risk
+    tp1P := fixedX ? close + tp1Pips * pipSize : close + tp1R * risk
     tp2P := close + tp2R * risk
     sigBar := bar_index
     strategy.entry("L", strategy.long, qty = riskUSD / risk)
@@ -318,9 +326,9 @@ if goLong
          " TP1 " + str.tostring(tp1P, format.mintick) + " TP2 " + str.tostring(tp2P, format.mintick), alert.freq_once_per_bar_close)
 
 if goShort
-    float risk = shortSL - close
-    slP := shortSL
-    tp1P := close - tp1R * risk
+    float risk = fixedX ? slPips * pipSize : shortSL - close
+    slP := close + risk
+    tp1P := fixedX ? close - tp1Pips * pipSize : close - tp1R * risk
     tp2P := close - tp2R * risk
     sigBar := bar_index
     strategy.entry("S", strategy.short, qty = riskUSD / risk)
@@ -329,6 +337,20 @@ if goShort
     strategy.exit("S-TP2", "S", limit = tp2P, stop = slP)
     alert("UHV SELL: entry ~" + str.tostring(close, format.mintick) + " SL " + str.tostring(slP, format.mintick) +
          " TP1 " + str.tostring(tp1P, format.mintick) + " TP2 " + str.tostring(tp2P, format.mintick), alert.freq_once_per_bar_close)
+
+// Breakeven after TP1: once part of the position is closed, move the remaining stop to the entry price
+var float entQty = 0.0
+var bool  beDone = false
+if strategy.position_size != 0 and nz(strategy.position_size[1]) == 0
+    entQty := math.abs(strategy.position_size)
+    beDone := false
+if useBE and tp1Pct > 0 and not beDone and strategy.position_size != 0 and math.abs(strategy.position_size) < entQty * 0.999
+    beDone := true
+    slP := strategy.position_avg_price
+    if strategy.position_size > 0
+        strategy.exit("L-TP2", "L", limit = tp2P, stop = slP)
+    else
+        strategy.exit("S-TP2", "S", limit = tp2P, stop = slP)
 
 if not flat and not na(sigBar) and bar_index - sigBar >= maxHold
     strategy.close_all(comment = "time")
