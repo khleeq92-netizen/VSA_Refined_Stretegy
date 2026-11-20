@@ -121,7 +121,8 @@ def run(d, f, side, zone_kinds=("fvg_H1", "fvg_H4", "ob_H1"), use_zone=True, bg_
         # CISD level: open of the run of red candles that ends at the UHV candle
         j = u
         while j > 0 and red[j - 1]: j -= 1
-        cisd = O[j]
+        while j > 0 and H[j] <= H[j - 1] and L[j] >= L[j - 1]: j -= 1   # CISD candle must not be inside
+        cisd = H[j]
         level = max(H[u], cisd) if use_cisd else H[u]
         trig = None
         for t in range(sw + 1, min(n - 1, sw + 1 + w_trig)):

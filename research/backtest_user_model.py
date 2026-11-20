@@ -55,7 +55,8 @@ def pivots(d):
 
 
 def run(d, f, side, uhv_mult=1.75, vol_n=10, use_sweep=True, use_uhv=True, use_cisd=True,
-        sessions=("NY", "Overlap"), r_targets=(1.0, 2.0), be_after_tp1=False, partial=0.5):
+        sessions=("NY", "Overlap"), r_targets=(1.0, 2.0), be_after_tp1=False, partial=0.5,
+        inside_rule="cisd", cisd_ref="high"):
     o, h, l, c, v = (d[x].values for x in ("open", "high", "low", "close", "volume"))
     v = v.astype(float)
     n = len(d)
@@ -112,9 +113,13 @@ def run(d, f, side, uhv_mult=1.75, vol_n=10, use_sweep=True, use_uhv=True, use_c
                 j = lo_bar
                 while j > 0 and not (C[j] < O[j]): j -= 1       # nearest bearish candle at/before low
                 while j > 0 and C[j - 1] < O[j - 1]: j -= 1     # start of that bearish run
-                cisd = O[j]
+                # CISD candle = first candle of that bearish run; it must not be an inside candle:
+                # if it is, step back to its mother candle (the candle whose range contains it).
+                if inside_rule == "cisd":
+                    while j > 0 and H[j] <= H[j - 1] and L[j] >= L[j - 1]: j -= 1
+                cisd = H[j] if cisd_ref == "high" else O[j]
                 level = max(H[u], cisd) if use_cisd else H[u]
-                inside = (H[i] <= H[i - 1]) and (L[i] >= L[i - 1])
+                inside = inside_rule == "trigger" and (H[i] <= H[i - 1]) and (L[i] >= L[i - 1])
                 if C[i] > O[i] and C[i] > level and not inside and sess[i] in sessions:
                     t = trade(d, i, u, s, H, L, O, C, atr, r_targets, be_after_tp1, partial,
                               dict(sweep_bar=state["sweep"], level=state["lvl"], uhv_ratio=vr[u],
@@ -181,6 +186,8 @@ if __name__ == "__main__":
     US = ("NY", "Overlap"); ALL = ("Asia", "London", "NY", "Overlap")
     configs = [
         ("D: Sweep+UHV+CISD (YOUR MODEL)", dict()),
+        ("D, CISD level = open of CISD candle", dict(cisd_ref="open")),
+        ("D-old: no-inside on entry candle, CISD=open", dict(inside_rule="trigger", cisd_ref="open")),
         ("A: Sweep+UHV, no CISD (close>UHV high)", dict(use_cisd=False)),
         ("B: UHV+CISD, no sweep", dict(use_sweep=False)),
         ("C: Sweep+CISD, no UHV", dict(use_uhv=False)),

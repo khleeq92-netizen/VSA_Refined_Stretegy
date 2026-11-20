@@ -81,3 +81,21 @@ SL beyond the lowest low (highest high) since the UHV candle; 50% @1R, rest @2R.
 **Conclusion:** as described, the model fires only about 0.5–0.6 times per week per side in the US session. Fourteen
 trades in 13.5 weeks cannot show whether it has an edge. Every number above is within random noise. Validation
 requires the multi-year Deep Backtest.
+
+---
+# Correction: the no-inside rule applies to the CISD candle (trader clarification)
+
+CISD candle = the first candle of the opposite-colour run that made the extreme. If it is an inside candle (its range
+sits within the previous candle's range), use its mother candle instead. Entry requires a close beyond both the
+UHV candle and the CISD candle (its high for buys / low for sells; the open is tested as a variant).
+
+| Simple model (sweep + UHV + CISD), US session | BUY n / avg R / PF | SELL n / avg R / PF |
+|---|---|---|
+| Earlier coding (no-inside on entry candle, CISD = open) | 40 / −0.25 / 0.56 | 41 / +0.21 / 1.53 |
+| **Corrected: no-inside on CISD candle, close above its high/low** | 37 / −0.35 / 0.40 | 38 / +0.17 / 1.44 |
+| Corrected, CISD level = the CISD candle's open | 40 / −0.25 / 0.56 | 44 / +0.19 / 1.51 |
+| Without CISD (close beyond the UHV candle only) | 56 / −0.08 / 0.86 | 62 / +0.08 / 1.18 |
+
+The conclusions are unchanged: BUY loses in this bearish sample and the SELL mirror is positive in both halves, but
+neither is statistically significant. Using the CISD candle's high (instead of its open) makes entries slightly later
+and slightly worse. v2 (zone-filtered) is unaffected in practice: 6 BUY / 8 SELL trades.
