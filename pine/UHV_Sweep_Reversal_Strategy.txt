@@ -500,3 +500,51 @@ plotshape(uhvBuy and allowB, "UHV buy candle", shape.triangleup, location.belowb
 plotshape(uhvSell and allowS, "UHV sell candle", shape.triangledown, location.abovebar, color.maroon, offset = -uOff, size = size.tiny)
 plotshape(bAct and bSw and bar_index == bSwBar, "Buy sweep", shape.xcross, location.belowbar, color.teal, size = size.tiny)
 plotshape(sAct and sSw and bar_index == sSwBar, "Sell sweep", shape.xcross, location.abovebar, color.maroon, size = size.tiny)
+
+// ═════════ Results table (on the chart, in R units; partial exits of one trade are combined)
+showTbl = input.bool(true, "Show results table (R)", group = gG)
+var table rt = table.new(position.top_right, 2, 8, bgcolor = color.new(color.gray, 85), border_color = color.gray, border_width = 1)
+f_cell(int row, string k, string v) =>
+    table.cell(rt, 0, row, k, text_size = size.small, text_halign = text.align_left)
+    table.cell(rt, 1, row, v, text_size = size.small, text_halign = text.align_right)
+if showTbl and barstate.islast and strategy.closedtrades > 0
+    arr = array.new_float()
+    int lastEB = -1
+    for i = 0 to strategy.closedtrades - 1
+        int eb = strategy.closedtrades.entry_bar_index(i)
+        float r = strategy.closedtrades.profit(i) / riskUSD
+        if eb == lastEB and array.size(arr) > 0
+            array.set(arr, array.size(arr) - 1, array.get(arr, array.size(arr) - 1) + r)
+        else
+            array.push(arr, r)
+        lastEB := eb
+    float tot = 0.0
+    float gp = 0.0
+    float gl = 0.0
+    float peak = 0.0
+    float mdd = 0.0
+    int wins = 0
+    int streak = 0
+    int maxStreak = 0
+    for j = 0 to array.size(arr) - 1
+        float r = array.get(arr, j)
+        tot += r
+        peak := math.max(peak, tot)
+        mdd := math.max(mdd, peak - tot)
+        if r > 0
+            wins += 1
+            gp += r
+            streak := 0
+        else
+            gl -= r
+            streak += 1
+            maxStreak := math.max(maxStreak, streak)
+    int nT = array.size(arr)
+    f_cell(0, "Trades", str.tostring(nT))
+    f_cell(1, "Win %", str.tostring(100.0 * wins / nT, "#.0") + "%")
+    f_cell(2, "Total R", str.tostring(tot, "#.0"))
+    f_cell(3, "Avg R / trade", str.tostring(tot / nT, "#.000"))
+    f_cell(4, "Profit factor", gl > 0 ? str.tostring(gp / gl, "#.00") : "-")
+    f_cell(5, "Max drawdown", str.tostring(mdd, "#.0") + " R")
+    f_cell(6, "Max losing streak", str.tostring(maxStreak))
+    f_cell(7, "1 R =", "$" + str.tostring(riskUSD, "#,###"))
