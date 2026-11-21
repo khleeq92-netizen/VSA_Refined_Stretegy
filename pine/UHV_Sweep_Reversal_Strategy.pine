@@ -4,7 +4,7 @@
 // Purpose: multi-year validation. It is NOT a validated live-trading system.
 //
 // Default setup (rebuilt from the trader's chart examples, 11/12/16/19-Nov-2026) + best research filters:
-//  BUY : UHV candle range >= 2 x ATR(20); exit 100% at 100 pips (SL 160 pips).
+//  BUY : UHV candle range >= 2 x ATR(20); no Asia-session entries; ATR exits (SL 3.5 ATR, TP 2.25 ATR, 100% at TP).
 //  SELL: UHV volume >= 2.5 x average; no entries in the London-NY overlap; 50% at 100 pips, rest at 2 x SL.
 //  BUY : selling climax in the lower part of the range -> the UHV candle is the VOLUME PEAK of that climax
 //        (red, volume >= 2x avg, higher than the 2 candles before and the candle after) -> a later candle
@@ -27,6 +27,8 @@ dirMode   = input.string("Buy only", "Direction", options = ["Buy only", "Sell o
      tooltip = "Run Buy only and Sell only as separate backtests to match the research.")
 startT    = input.time(timestamp("2021-01-01T00:00:00"), "Backtest start", group = gG)
 endT      = input.time(timestamp("2030-01-01T00:00:00"), "Backtest end", group = gG)
+setupSel  = input.string("A only", "Setups", options = ["A only", "B only", "A + B"], group = gG,
+     tooltip = "A = UHV sweep reversal (your model). B = low-volume pullback (No Supply) after a bullish UHV displacement. B is experimental.")
 riskUSD   = input.float(100, "Risk per trade ($) — profit / this = R", minval = 1, group = gG)
 sessMode  = input.string("All sessions", "Trade in", options = ["All sessions", "Custom session"], group = gG)
 custSess  = input.session("0800-1700", "Custom session", group = gG)
@@ -298,6 +300,9 @@ f_orders(bool isLong, float entryPx, float structSL, bool asStop) =>
 // In "Both" mode only one side may fire per bar (BUY has priority)
 bool firedB = false
 
+useA = setupSel != "B only"
+useB = setupSel != "A only"
+
 // ═════════ BUY setup state machine
 var bool  bAct = false
 var bool  bSw = false
@@ -336,7 +341,7 @@ if bAct and bar_index > bU
                     firedB := true
                 bAct := false
 
-if not bAct and uhvBuy and flat and allowB and (not useZone or zoneBull) and uRngAtr >= minRngB and regB
+if useA and not bAct and uhvBuy and flat and allowB and (not useZone or zoneBull) and uRngAtr >= minRngB and regB
     bAct := true
     bSw := false
     bU := bar_index - uOff
@@ -350,6 +355,50 @@ if not bAct and uhvBuy and flat and allowB and (not useZone or zoneBull) and uRn
             bSwBar := bar_index
         else if cancelOpp and close > bH
             bAct := false
+
+// ═════════ SETUP B (BUY): low-volume pullback (No Supply) after a bullish UHV displacement
+// 1. Displacement: green, volume >= 2x avg, range >= 1.5x ATR, close in the top 30% of its range.
+// 2. Within 24 candles: No Supply = red, range <= 0.8x ATR, volume below each of the 2 previous candles and
+//    <= 0.8x avg, pullback low stays above the displacement candle's midpoint.
+// 3. Within 6 candles of the No Supply candle: a candle CLOSES above its high -> buy next open.
+gBs = "Setup B (experimental)"
+bDispVol = input.float(2.0, "Displacement volume >= x avg", step = 0.25, group = gBs)
+bDispRng = input.float(1.5, "Displacement range >= x ATR", step = 0.25, group = gBs)
+bNsRng   = input.float(0.8, "No Supply range <= x ATR", step = 0.1, group = gBs)
+bNsVol   = input.float(0.8, "No Supply volume <= x avg", step = 0.1, group = gBs)
+var int   pbDisp = na
+var float pbMid = na
+var float pbLow = na
+var bool  pbArm = false
+var float pbNsH = na
+var int   pbNsBar = na
+dispB = close > open and volume >= bDispVol * vAvg and (high - low) >= bDispRng * atr20 and (close - low) >= 0.7 * (high - low)
+if useB and allowB
+    if not na(pbDisp) and bar_index > pbDisp
+        pbLow := math.min(pbLow, low)
+        if low < pbMid or not flat
+            pbDisp := na
+            pbArm := false
+        else
+            if pbArm and bar_index - pbNsBar > 6
+                pbArm := false
+            if pbArm and close > pbNsH
+                if inSessB and inDate and flat and regB and not firedB
+                    f_orders(true, close, pbLow - slBuf, false)
+                    firedB := true
+                pbArm := false
+            else if bar_index - pbDisp <= 24 and close < open and (high - low) <= bNsRng * atr20 and volume < volume[1] and volume < volume[2] and volume <= bNsVol * vAvg
+                pbArm := true
+                pbNsH := high
+                pbNsBar := bar_index
+            if bar_index - pbDisp > 24 and not pbArm
+                pbDisp := na
+    if dispB and flat
+        pbDisp := bar_index
+        pbMid := (high + low) / 2
+        pbLow := low
+        pbArm := false
+plotshape(useB and dispB and allowB, "B displacement", shape.diamond, location.belowbar, color.new(color.blue, 30), size = size.tiny)
 
 // ═════════ SELL setup state machine (mirror)
 var bool  sAct = false
