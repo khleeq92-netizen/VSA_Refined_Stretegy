@@ -14,6 +14,8 @@
 //  SELL: exact mirror.
 // All signals use confirmed bars. Higher-timeframe zones use completed HTF candles only (no repainting).
 // Run BUY-only and SELL-only as separate backtests to match the research.
+// Works on OANDA:XAUUSD (tick volume) and COMEX GC1! (real futures volume): position size uses syminfo.pointvalue.
+// On GC1! set Properties -> Commission to about 15 USD per contract (≈ the $0.15/oz spread + fees of one side).
 //@version=6
 strategy("UHV Sweep Reversal [research]", overlay = true, initial_capital = 100000,
      default_qty_type = strategy.fixed, default_qty_value = 1, pyramiding = 0,
@@ -281,7 +283,7 @@ f_orders(bool isLong, float entryPx, float structSL, bool asStop) =>
     string id = isLong ? "L" : "S"
     float  pct = isLong ? tp1PctB : tp1PctS
     float  risk = fixedX ? fixRisk : math.abs(entryPx - structSL)
-    float  qty = riskUSD / risk
+    float  qty = riskUSD / (risk * syminfo.pointvalue)   // pointvalue: 1 for OANDA spot (per oz), 100 for COMEX GC (per contract)
     if asStop
         strategy.entry(id, isLong ? strategy.long : strategy.short, qty = qty, stop = entryPx)
     else
