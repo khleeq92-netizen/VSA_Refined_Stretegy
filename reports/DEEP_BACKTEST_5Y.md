@@ -49,3 +49,16 @@ Session filters (BUY), checked in both runs:
 | **skip Asia session** | **PF 1.38, 67% win, DD 7.7R (2023–24 1.16, 2025–26 1.70)** | PF 1.10 |
 | London + NY-after-London only | PF 1.92, 77% win, 52 tr | PF 1.15 |
 Pine default now: skip Asia ON (candidate; must be confirmed on 2021–22, which this filter was not chosen on).
+
+---
+# TradingView confirmation: defaults (BUY, ATR exits, skip Asia), OANDA:XAUUSD, 2023-01 → 2026-11
+File `data/deep_backtest/run_2023_now_skipAsia_OANDA.csv` (labelled by the trader as GC, but symbol and prices are OANDA spot).
+
+| Year | Trades | Win % | Total R | PF | Max DD (R) |
+|---|---|---|---|---|---|
+| 2023 | 47 | 57.4 | −1.9 | 0.88 | 7.7 |
+| 2024 | 35 | 74.3 | +6.0 | 1.67 | 2.1 |
+| 2025 | 38 | 68.4 | +5.6 | 1.59 | 3.7 |
+| 2026 | 37 | 70.3 | +6.6 | 1.74 | 3.8 |
+| All | 157 | 66.9 | +16.2 | 1.37 | 7.7 (max 6 losses in a row) |
+Matches the offline estimate (158 trades, PF 1.38). 2023 is the only losing year.
