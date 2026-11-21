@@ -506,7 +506,9 @@ plotshape(sAct and sSw and bar_index == sSwBar, "Sell sweep", shape.xcross, loca
 
 // ═════════ Results table (on the chart, in R units; partial exits of one trade are combined)
 showTbl = input.bool(true, "Show results table (R)", group = gG)
-var table rt = table.new(position.top_right, 2, 8, bgcolor = color.new(color.gray, 85), border_color = color.gray, border_width = 1)
+tblPos  = input.string("Bottom left", "Results table position", options = ["Bottom left", "Top left", "Bottom right", "Top right", "Middle left"], group = gG)
+tblP    = tblPos == "Top left" ? position.top_left : tblPos == "Bottom right" ? position.bottom_right : tblPos == "Top right" ? position.top_right : tblPos == "Middle left" ? position.middle_left : position.bottom_left
+var table rt = table.new(tblP, 2, 8, bgcolor = color.new(color.gray, 85), border_color = color.gray, border_width = 1)
 f_cell(int row, string k, string v) =>
     table.cell(rt, 0, row, k, text_size = size.small, text_halign = text.align_left)
     table.cell(rt, 1, row, v, text_size = size.small, text_halign = text.align_right)
