@@ -1,0 +1,13 @@
+sample,risk_pct,pass_pct,fail_pct,not_done_1yr_pct,median_days,fast_25pct_days,slow_75pct_days
+All 2023-2026 (realistic),0.5,0,0,100,608.0,579.0,679.0
+All 2023-2026 (realistic),1.0,17,0,83,463.0,389.0,542.0
+All 2023-2026 (realistic),1.5,41,4,55,369.0,282.0,460.0
+All 2023-2026 (realistic),2.0,57,11,31,305.0,218.0,397.0
+2023-2024 only (quiet market),0.5,0,0,100,,,
+2023-2024 only (quiet market),1.0,6,1,92,487.0,402.0,570.0
+2023-2024 only (quiet market),1.5,22,10,69,389.0,308.0,474.0
+2023-2024 only (quiet market),2.0,37,22,41,309.0,224.0,412.0
+2025-2026 only (volatile market),0.5,0,0,100,594.0,577.0,642.0
+2025-2026 only (volatile market),1.0,37,0,63,448.0,373.0,534.0
+2025-2026 only (volatile market),1.5,66,1,33,342.0,263.0,425.0
+2025-2026 only (volatile market),2.0,78,4,18,269.0,193.0,362.0
